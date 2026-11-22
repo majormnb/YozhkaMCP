@@ -21,7 +21,9 @@ def _client(**kwargs) -> YozhkaClient:
     cfg.read_only = False
     cfg.request_timeout = 5.0
     cfg.max_retries = 3
+    cfg.max_concurrent = 4
     cfg.debug = False
+    cfg.token_cache_path = None
     for k, v in kwargs.items():
         setattr(cfg, k, v)
     return YozhkaClient(cfg)

@@ -62,11 +62,18 @@ Claude Desktop — то же самое, но файл называется `~/L
 
 Всё то же самое, но по-другому. Работай в PowerShell (Пуск → набери «PowerShell»).
 
-**1. Поставить uv** (и Git, если его нет):
+**1. Поставить uv** (и Git, если его нет). Через winget:
 
 ```powershell
 winget install --id astral-sh.uv -e
 winget install --id Git.Git -e          # только если git ещё не установлен
+```
+
+или через Chocolatey, если она у тебя уже стоит:
+
+```powershell
+choco install uv -y
+choco install git -y                    # только если git ещё не установлен
 ```
 
 После установки закрой и снова открой PowerShell (чтобы обновился PATH). Проверка: `uv --version` — печатает версию.

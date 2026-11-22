@@ -50,6 +50,8 @@ TASK_LIST = "/task/{project_id}/list"                      # GET ?page=0&size=&s
 TASK_SEARCH = "/task/searchByProjectId/{project_id}"       # GET ?searchText=
 TASK_BY_CODE = "/task/code/{task_code}"                    # GET
 TASK_BY_ID = "/task/{task_id}"                             # DELETE
+TASK_TOGGLE_COMPLETION = "/task/{task_id}/toggleCompletion"  # POST — РЕАЛЬНОЕ завершение (ставит completeTs);
+                                                           # isCompleted в PUT /task сервер игнорирует
 TASK_PRIORITY = "/taskPriority"                            # GET
 TASK_HISTORY = "/task/{task_id}/history"                   # GET ?page=0&size=
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 
+import httpx
 import respx
 from fastmcp import Client
 from fastmcp.exceptions import ToolError
@@ -256,3 +257,41 @@ async def test_delete_task_with_confirm_executes():
         r = await c.call_tool("delete_task", {"task_code": "X-1", "confirm": True})
         assert _data(r)["deleted"] == "X-1"
         assert delete_route.called
+
+
+# ---------- настоящее завершение через toggleCompletion ----------
+
+@respx.mock
+async def test_complete_task_uses_toggle_not_put():
+    """PUT с isCompleted сервер игнорирует — тул обязан дёргать toggleCompletion."""
+    # два GET подряд: до тоггла (False) и после (True с настоящим штампом)
+    respx.get(f"{BASE}/task/code/X-1").mock(side_effect=[
+        httpx.Response(200, json={"id": 1, "code": "X-1", "title": "T", "statusId": 2,
+                                  "projectId": 5, "isCompleted": False,
+                                  "completeTs": "2999-12-31T00:00:00Z"}),
+        httpx.Response(200, json={"id": 1, "code": "X-1", "title": "T", "statusId": 2,
+                                  "projectId": 5, "isCompleted": True,
+                                  "completeTs": "2026-11-22T22:33:26Z"}),
+    ])
+    toggle_route = respx.post(f"{BASE}/task/1/toggleCompletion").respond(json={"ok": True})
+    put_route = respx.put(f"{BASE}/task").respond(json={"id": 1})
+    async with Client(server.mcp) as c:
+        r = await c.call_tool("complete_task", {"task_code": "X-1"})
+        data = _data(r)
+        assert data["isCompleted"] is True
+        assert data["completeTs"] != "2999-12-31T00:00:00Z"  # настоящий штамп
+        assert toggle_route.called
+        assert not put_route.called
+
+
+@respx.mock
+async def test_complete_task_skips_toggle_when_state_matches():
+    """Уже выполнена, просили completed=True — тоггл не дёргается (иначе снимет)."""
+    respx.get(f"{BASE}/task/code/X-1").respond(json={
+        "id": 1, "code": "X-1", "title": "T", "statusId": 3, "projectId": 5,
+        "isCompleted": True, "completeTs": "2026-11-01T10:00:00Z"})
+    toggle_route = respx.post(f"{BASE}/task/1/toggleCompletion").respond(json={})
+    async with Client(server.mcp) as c:
+        r = await c.call_tool("complete_task", {"task_code": "X-1", "completed": True})
+        assert _data(r)["isCompleted"] is True
+        assert not toggle_route.called

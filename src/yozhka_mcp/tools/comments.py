@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastmcp import FastMCP
 
 from ..api.client import YozhkaClient
-from ._shared import resolve_mentions, strip_html, write_guard
+from ._shared import html_with_mentions, run, strip_html, write_guard
 
 
 def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
@@ -26,9 +26,9 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
         async def _fn():
             task = await client.get_task(task_code)
             me = await client.get_my_profile()
-            body = await resolve_mentions(text, client.find_user_by_email)
-            return await client.add_comment(task["id"], me["id"], body, reply_to=reply_to)
-        return await write_guard(read_only, _fn)()
+            html = await html_with_mentions(text, client.find_user_by_email)
+            return await client.add_comment(task["id"], me["id"], html, reply_to=reply_to)
+        return await run(write_guard(read_only, _fn))
 
     @mcp.tool
     async def update_comment(task_code: str, comment_id: int, text: str) -> dict:
@@ -37,12 +37,14 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
         async def _fn():
             task = await client.get_task(task_code)
             comment = await client.get_comment(task["id"], comment_id)
-            body = await resolve_mentions(text, client.find_user_by_email)
-            comment["contentComment"] = f"<p>{body}</p>"
-            updated = await client.update_comment(comment)
+            html = await html_with_mentions(text, client.find_user_by_email)
+            comment["contentComment"] = html
+            await client.update_comment(comment)
+            # PUT может ответить пустым телом — перечитываем для подтверждения
+            updated = await client.get_comment(task["id"], comment_id)
             updated["text"] = strip_html(updated.get("contentComment"))
             return updated
-        return await write_guard(read_only, _fn)()
+        return await run(write_guard(read_only, _fn))
 
     @mcp.tool
     async def delete_comment(task_code: str, comment_id: int) -> dict:

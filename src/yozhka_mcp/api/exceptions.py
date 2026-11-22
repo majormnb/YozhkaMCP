@@ -29,6 +29,10 @@ class ValidationError(YozhkaError):
 class RateLimitError(YozhkaError):
     """429 — превышен лимит запросов (после всех ретраев)."""
 
+    def __init__(self, message, *, retry_after: float | None = None, **kwargs):
+        super().__init__(message, **kwargs)
+        self.retry_after = retry_after
+
 
 class ApiError(YozhkaError):
     """Прочие ошибки API (5xx и нестандартные ответы)."""

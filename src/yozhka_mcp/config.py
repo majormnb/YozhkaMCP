@@ -26,6 +26,13 @@ class Config:
         load_dotenv()  # и из текущего каталога
 
         self.base_url: str = os.environ.get("YOZHKA_BASE_URL", DEFAULT_BASE_URL).rstrip("/")
+        if not (self.base_url.startswith("https://")
+                or self.base_url.startswith("http://localhost")
+                or self.base_url.startswith("http://127.0.0.1")):
+            # иначе свежий Bearer-токен уйдёт на произвольный хост
+            raise ValueError(
+                f"YOZHKA_BASE_URL должен быть https://… или http://localhost…, получено: {self.base_url!r}"
+            )
         # Основной способ: refresh-токен (живёт ~30 дней), access получаем сами.
         self.refresh_token: str | None = os.environ.get("YOZHKA_REFRESH_TOKEN") or None
         # Альтернатива: готовый access-токен (живёт ~1 час).
@@ -39,6 +46,9 @@ class Config:
         self.transport: str = os.environ.get("YOZHKA_TRANSPORT", "stdio").strip().lower()
         self.host: str = os.environ.get("YOZHKA_HOST", "127.0.0.1")
         self.port: int = int(os.environ.get("YOZHKA_PORT", "8000"))
+        # http-режим: если задан, все запросы должны нести Authorization: Bearer <token>
+        # или X-MCP-Token. Без токена эндпоинт доступен только с localhost.
+        self.http_token: str | None = os.environ.get("YOZHKA_HTTP_TOKEN") or None
 
     @property
     def has_auth(self) -> bool:

@@ -7,6 +7,9 @@ from typing import Any, Callable
 
 from fastmcp.exceptions import ToolError
 
+from ..api import text as _text
+from ..api.exceptions import YozhkaError
+
 _TASK_FIELDS_SHORT = ("id", "code", "title", "statusId", "statusName", "priorityId",
                       "deadlineTs", "executorsIds", "isCompleted")
 
@@ -25,13 +28,25 @@ def write_guard(read_only: bool, fn: Callable) -> Callable:
     return guarded
 
 
+async def run(fn: Callable) -> Any:
+    """Выполнить работу тула, превратив ошибки API в понятный ToolError.
+
+    Без этого читаемость сообщений зависит от настроек маскировки ошибок
+    конкретного клиента/хостинга FastMCP.
+    """
+    try:
+        return await fn()
+    except YozhkaError as exc:
+        raise ToolError(str(exc)) from exc
+
+
 def compact(task: dict) -> dict:
     """Краткое представление задачи для списков (экономия токенов)."""
     return {k: task.get(k) for k in _TASK_FIELDS_SHORT}
 
 
 def strip_html(value: Any) -> Any:
-    """Убрать <p>…</p> обёртку из текстовых полей."""
+    """Убрать <p>…</p> обёртку из текстовых полей (пустая строка -> None)."""
     if not isinstance(value, str):
         return value
     text = re.sub(r"</?p[^>]*>", "", value).strip()
@@ -39,36 +54,34 @@ def strip_html(value: Any) -> Any:
 
 
 def wrap_html(value: str) -> str:
-    """Обернуть текст в <p>…</p> (API ждёт HTML для contentData/itemTitle/contentComment)."""
-    value = value.strip()
-    if value.startswith("<"):
-        return value
-    return f"<p>{value}</p>"
+    """Безопасный HTML из текста: экранировать и обернуть в <p>…</p>.
+
+    Сырой HTML больше не пропускается (stored-XSS): маркеры упоминаний @[email]
+    экранирование переживают и подставляются после — через html_with_mentions.
+    """
+    return _text.wrap(_text.escape(value.strip()))
 
 
-MENTION_RE = re.compile(r"@\[([^\]]+)\]")
-
-
-def mention_html(user: dict) -> str:
-    """Живой тег упоминания Ёжки (TipTap mention: span data-type="mention")."""
-    mail = user.get("mail") or user.get("email") or ""
-    name = user.get("displayName") or mail
-    return f'<span data-type="mention" data-id="{user.get("id")},{mail}" data-label="{name}">@{name}</span>'
-
-
-async def resolve_mentions(text: str, lookup) -> str:
-    """Заменить @[email] в тексте на живые теги упоминания.
+async def html_with_mentions(text: str, lookup: Callable) -> str:
+    """Пайплайн безопасного HTML: escape → подстановка @[email]-упоминаний → <p>-обёртка.
 
     lookup — async функция email → список пользователей (client.find_user_by_email).
     Плейн-текст «@имя» остаётся текстом: Ёжка делает упоминание живым только span-тегом.
     """
-    matches = {m.group(0): m.group(1).strip() for m in MENTION_RE.finditer(text)}
+    escaped = _text.escape(text)
+    matches = {m.group(0): m.group(1).strip() for m in MENTION_RE.finditer(escaped)}
     for raw, email in matches.items():
         users = await lookup(email)
         if not users:
             raise ToolError(f"@[{email}]: пользователь не найден")
-        text = text.replace(raw, mention_html(users[0]))
-    return text
+        user = users[0]
+        mail = user.get("mail") or user.get("email") or ""
+        span = _text.mention_span(user["id"], mail, user.get("displayName") or mail)
+        escaped = escaped.replace(raw, span)
+    return _text.wrap(escaped)
+
+
+MENTION_RE = re.compile(r"@\[([^\]]+)\]")
 
 
 def page_info(response: dict) -> dict:

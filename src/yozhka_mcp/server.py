@@ -1,4 +1,4 @@
-"""MCP-сервер Ёжки (FastMCP, stdio)."""
+"""MCP-сервер Ёжки (FastMCP, stdio/http)."""
 
 from __future__ import annotations
 
@@ -14,6 +14,34 @@ if config.debug:
     logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger("yozhka_mcp")
 
+_LOCAL_HOSTS = {"localhost", "127.0.0.1", "[::1]", "::1", "0.0.0.0"}
+
+
+def _http_guard(app):
+    """ASGI-гвард для http-режима: YOZHKA_HTTP_TOKEN; без него — только localhost.
+
+    Эндпоинт без авторизации = полный доступ к аккаунту Ёжки у любого процесса,
+    дотянувшегося до порта (включая DNS-rebinding из браузера).
+    """
+    async def guarded(scope, receive, send):
+        if scope["type"] == "http":
+            headers = {k.decode().lower(): v.decode() for k, v in scope.get("headers", [])}
+            if config.http_token:
+                ok = (headers.get("authorization") == f"Bearer {config.http_token}"
+                      or headers.get("x-mcp-token") == config.http_token)
+                status, message = 401, b"Unauthorized: wrong or missing YOZHKA_HTTP_TOKEN"
+            else:
+                host = (headers.get("host") or "").split(":")[0].lower()
+                ok = not host or host in _LOCAL_HOSTS
+                status, message = 403, b"Forbidden: set YOZHKA_HTTP_TOKEN to serve beyond localhost"
+            if not ok:
+                await send({"type": "http.response.start", "status": status,
+                            "headers": [(b"content-type", b"text/plain; charset=utf-8")]})
+                await send({"type": "http.response.body", "body": message})
+                return
+        await app(scope, receive, send)
+    return guarded
+
 
 @asynccontextmanager
 async def lifespan(app: FastMCP):
@@ -22,6 +50,13 @@ async def lifespan(app: FastMCP):
             "YOZHKA_REFRESH_TOKEN / YOZHKA_ACCESS_TOKEN не заданы — "
             "тулы будут возвращать ошибку аутентификации (см. README)"
         )
+    if config.read_only:
+        # Скрытие по docstring-тегу [write] — самосогласовано с разметкой тулов
+        # (префиксы имён пропускали convert_checklist_item_to_task).
+        tools = await app.list_tools()
+        write_tools = {t.name for t in tools if (t.description or "").startswith("[write]")}
+        app.disable(names=write_tools)
+        logger.info("READ_ONLY: скрыто write-тулов: %d", len(write_tools))
     yield
     await client.aclose()
 
@@ -37,34 +72,23 @@ mcp = FastMCP(
     lifespan=lifespan,
 )
 
-# Регистрация тулов по доменам (при READ_ONLY write-тулы не регистрируются)
+# Регистрация тулов по доменам (READ_ONLY скрывает [write]-тулы в lifespan)
 from .tools import auth, checklists, columns, comments, misc, projects, tasks, workspaces  # noqa: E402
 
 for module in (auth, workspaces, projects, columns, tasks, checklists, comments, misc):
     module.register(mcp, client, read_only=config.read_only)
-
-# READ_ONLY: write-тулы не видны клиенту (плюс write_guard внутри каждого вызова — defense-in-depth)
-_WRITE_TOOL_PREFIXES = (
-    "create_", "update_", "delete_", "move_", "set_", "invite_",
-    "archive_", "restore_", "toggle_", "complete_", "add_", "mark_",
-)
-if config.read_only:
-    async def _hide_write_tools() -> set[str]:
-        return {t.name for t in await mcp.list_tools()
-                if t.name.startswith(_WRITE_TOOL_PREFIXES)}
-    import asyncio as _aio
-    _write_tools = _aio.run(_hide_write_tools())
-    mcp.disable(names=_write_tools)
-    logger.info("READ_ONLY: скрыто write-тулов: %d", len(_write_tools))
 
 logger.info("Yozhka MCP: %s mode", "read-only" if config.read_only else "read-write")
 
 
 def main() -> None:
     if config.transport in {"http", "streamable-http", "sse"}:
-        # Сервис-режим: YOZHKA_TRANSPORT=http (+ YOZHKA_HOST/PORT), см. Dockerfile.
-        mcp.run(transport="http" if config.transport in {"http", "streamable-http"} else "sse",
-                host=config.host, port=config.port)
+        # Сервис-режим: YOZHKA_TRANSPORT=http (+ YOZHKA_HOST/PORT и YOZHKA_HTTP_TOKEN)
+        import uvicorn
+
+        app = mcp.http_app(path="/mcp",
+                           transport="sse" if config.transport == "sse" else "streamable-http")
+        uvicorn.run(_http_guard(app), host=config.host, port=config.port)
     else:
         mcp.run()  # stdio по умолчанию
 

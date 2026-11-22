@@ -15,7 +15,7 @@ from tenacity import (
     wait_exponential_jitter,
 )
 
-from ..config import Config
+from ..config import Config, config as app_config
 from . import endpoints as ep
 from .exceptions import (
     ApiError,
@@ -30,12 +30,22 @@ from .exceptions import (
 logger = logging.getLogger("yozhka_mcp")
 
 _RETRYABLE_STATUS = {429, 500, 502, 503, 504}
+_RETRY_AFTER_CAP = 30.0  # сек — даже если сервер попросил больше
 
 
 def _is_retryable(exc: BaseException) -> bool:
     if isinstance(exc, YozhkaError):
         return exc.status_code in _RETRYABLE_STATUS
     return isinstance(exc, (httpx.TransportError, asyncio.TimeoutError))
+
+
+def _wait(retry_state) -> float:
+    """Уважаем Retry-After при 429, иначе экспоненциальный джиттер."""
+    outcome = getattr(retry_state, "outcome", None)
+    exc = outcome.exception() if outcome else None
+    if isinstance(exc, RateLimitError) and exc.retry_after is not None:
+        return min(float(exc.retry_after), _RETRY_AFTER_CAP)
+    return wait_exponential_jitter(multiplier=0.5, max=8)(retry_state)
 
 
 class YozhkaClient:
@@ -49,6 +59,7 @@ class YozhkaClient:
         self._config = config
         self._access_token: str | None = config.access_token
         self._refresh_token: str | None = config.refresh_token
+        self._refresh_lock = asyncio.Lock()
         self._http = httpx.AsyncClient(
             base_url=config.base_url,
             timeout=config.request_timeout,
@@ -71,8 +82,8 @@ class YozhkaClient:
 
     @retry(
         retry=retry_if_exception(_is_retryable),
-        stop=stop_after_attempt(3),
-        wait=wait_exponential_jitter(multiplier=0.5, max=8),
+        stop=stop_after_attempt(app_config.max_retries),
+        wait=_wait,
         reraise=True,
     )
     async def _request(
@@ -84,16 +95,18 @@ class YozhkaClient:
         json_body: Any = None,
         data: str | None = None,
         headers: dict[str, str] | None = None,
+        files: dict[str, Any] | None = None,
         _is_refresh: bool = False,
+        _auth_retried: bool = False,
     ) -> Any:
+        self._ensure_open()  # клиент мог закрыть завершившийся lifespan — до любых запросов
         if not self._access_token and not _is_refresh:
             await self._refresh()
 
         req_headers: dict[str, str] = {}
-        self._ensure_open()
         if self._access_token:
             req_headers["Authorization"] = f"Bearer {self._access_token}"
-        if json_body is not None or data is not None:
+        if (json_body is not None or data is not None) and not files:
             req_headers["Content-Type"] = "application/json"
         if headers:
             req_headers.update(headers)
@@ -105,15 +118,17 @@ class YozhkaClient:
             content=data,
             json=json_body,
             headers=req_headers,
+            files=files,
         )
 
-        if response.status_code == 401 and not _is_refresh:
-            refreshed = await self._refresh()
-            if refreshed:
-                return await self._request(
-                    method, path, params=params, json_body=json_body, data=data,
-                    headers=headers,
-                )
+        # одна повторная попытка после 401: без флага невалидный access + живой refresh = бесконечный цикл
+        if response.status_code == 401 and not _is_refresh and not _auth_retried:
+            await self._refresh()
+            return await self._request(
+                method, path, params=params, json_body=json_body, data=data,
+                headers=headers, files=files,
+                _auth_retried=True,
+            )
 
         if response.status_code >= 400:
             self._raise_from_response(response)
@@ -135,7 +150,8 @@ class YozhkaClient:
             payload = response.json()
         except Exception:
             payload = response.text[:500]
-        detail = payload if not isinstance(payload, str) else payload
+        detail = payload.get("message") or payload.get("text") or payload \
+            if isinstance(payload, dict) else payload
         exc_type = {
             400: ValidationError,
             401: AuthError,
@@ -144,7 +160,12 @@ class YozhkaClient:
             422: ValidationError,
             429: RateLimitError,
         }.get(status, ApiError)
-        raise exc_type(f"HTTP {status}: {detail}", status_code=status, payload=payload)
+        kwargs: dict[str, Any] = {}
+        if status == 429:
+            retry_after = response.headers.get("Retry-After")
+            if retry_after and retry_after.isdigit():
+                kwargs["retry_after"] = int(retry_after)
+        raise exc_type(f"HTTP {status}: {detail}", status_code=status, payload=payload, **kwargs)
 
     async def _refresh(self) -> bool:
         """POST /auth/refresh — обменять refreshToken на новый access (+refresh)."""
@@ -152,23 +173,35 @@ class YozhkaClient:
             raise AuthError(
                 "Нет токена: задайте YOZHKA_REFRESH_TOKEN (см. README, как достать из браузера)"
             )
-        response = await self._http.post(
-            ep.AUTH_REFRESH,
-            json={"refreshToken": self._refresh_token},
-            headers={"Content-Type": "application/json"},
-        )
-        if response.status_code != 200:
-            raise AuthError(
-                f"Refresh failed ({response.status_code}): сессия истекла, "
-                "получите новый refreshToken в браузере (README)",
-                status_code=response.status_code,
+        access_before = self._access_token
+        async with self._refresh_lock:
+            # пока ждали лок, параллельный запрос мог уже обновить токены
+            if self._access_token and self._access_token != access_before:
+                return True
+            self._ensure_open()
+            response = await self._http.post(
+                ep.AUTH_REFRESH,
+                json={"refreshToken": self._refresh_token},
+                headers={"Content-Type": "application/json"},
             )
-        data = response.json()
-        self._access_token = data.get("accessToken")
-        if data.get("refreshToken"):
-            self._refresh_token = data["refreshToken"]
-        logger.info("Access token refreshed")
-        return True
+            if response.status_code != 200:
+                raise AuthError(
+                    f"Refresh failed ({response.status_code}): сессия истекла, "
+                    "получите новый refreshToken в браузере (README)",
+                    status_code=response.status_code,
+                )
+            data = response.json()
+            access = data.get("accessToken")
+            if not access:
+                raise AuthError(
+                    "Refresh вернул пустой accessToken — сессия истекла, "
+                    "получите новый refreshToken в браузере (README)"
+                )
+            self._access_token = access
+            if data.get("refreshToken"):
+                self._refresh_token = data["refreshToken"]
+            logger.info("Access token refreshed")
+            return True
 
     # ---------- Auth ----------
 
@@ -329,7 +362,7 @@ class YozhkaClient:
             "statusId": status_id,
             "statusColor": "", "statusName": "",
             "typeId": ep.TASK_TYPE_DEFAULT,
-            "contentData": f"<p>{description}</p>" if description else "",
+            "contentData": description,  # готовый HTML: экранирование и упоминания — в tools/_shared.html_with_mentions
             "attachments": [],
             "orderNum": 0,
             "executorsIds": executors_ids or [],
@@ -375,12 +408,13 @@ class YozhkaClient:
         return await self._request("GET", ep.CHECKLIST_LIST.format(task_id=task_id),
                                    params={"page": 0, "size": 9999, "searchText": ""})
 
-    async def add_checklist_item(self, task_id: int, title: str, order_num: int = 1) -> dict:
+    async def add_checklist_item(self, task_id: int, title_html: str, order_num: int = 1) -> dict:
+        """title_html — готовый HTML (tools/_shared.html_with_mentions)."""
         return await self._request("POST", ep.CHECKLIST, json_body={
             "taskId": task_id,
             "taskTitle": "", "taskCode": "", "taskStatusColor": "", "taskStatusName": "",
             "orderNum": order_num,
-            "itemTitle": f"<p>{title}</p>",
+            "itemTitle": title_html,
             "itemAuthor": -1,
             "createTs": None, "updateTs": None,
             "markBy": None, "markTs": None, "markComment": None,
@@ -418,9 +452,10 @@ class YozhkaClient:
         return await self._request("GET", ep.COMMENT_LIST.format(task_id=task_id),
                                    params={"page": page, "size": size, "search": "", "filter": "{}"})
 
-    async def add_comment(self, task_id: int, creator_id: int, text: str, reply_to: int | None = None) -> dict:
+    async def add_comment(self, task_id: int, creator_id: int, text_html: str, reply_to: int | None = None) -> dict:
+        """text_html — готовый HTML (tools/_shared.html_with_mentions)."""
         return await self._request("POST", ep.COMMENT, json_body={
-            "contentComment": f"<p>{text}</p>",
+            "contentComment": text_html,
             "creatorId": creator_id,
             "replyTo": reply_to,
             "taskId": task_id,
@@ -453,7 +488,7 @@ class YozhkaClient:
         return result
 
     async def find_user_by_email(self, email: str) -> list:
-        return await self._request("GET", ep.USER_PROFILE_FIND.format(email=quote(email)))
+        return await self._request("GET", ep.USER_PROFILE_FIND.format(email=quote(email, safe="")))
 
     # ---------- Уведомления ----------
 

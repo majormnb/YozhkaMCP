@@ -1,0 +1,38 @@
+[
+  {
+    "kind": "xhr",
+    "method": "GET",
+    "reqBody": null,
+    "reqHeaders": {},
+    "respBody": "[{\"id\":17160,\"mail\":\"begattsu@gmail.com\",\"displayName\":\"Гендос\",\"department\":null,\"company\":null,\"employeePosition\":null,\"roleId\":1,\"projDefRoleId\":null,\"chiefUserId\":null,\"employeeNumber\":null,\"officeLocation\":null,\"officePhone\":null,\"chiefMail\":null,\"chiefDisplayName\":null,\"iconUrl\":null,\"attachments\":[],\"personalPhone\":null,\"absenceBegin\":null,\"absenceEnd\":null,\"absenceType\":null,\"aboutMe\":null,\"birthdayDay\":null,\"birthdayMonth\":null,\"town\":null,\"hideBirthday\":false,\"isBlocked\":false,\"blockDate\":\"2999-12-31T00:00:00Z\",\"roles\":[{\"roleId\":13,\"roleType\":2,\"roleName\":\"Владелец проекта\",\"roleNameM\":\"role.project_owner\"}],\"isExternalUser\":true,\"firstName\":null,\"lastName\":null,\"middleName\":null,\"preferredCommunication\":null,\"isDeleted\":false,\"closeTs\":null,\"iconId\":null,\"telegramName\":null,\"projects\":[25072],\"isActive\":true,\"isNewUser\":false}]",
+    "status": 200,
+    "url": "https://yozhka.lukit.ru/backend/project/25072/activeUsers"
+  },
+  {
+    "kind": "xhr",
+    "method": "GET",
+    "reqBody": null,
+    "reqHeaders": {},
+    "respBody": "{\"content\":[{\"id\":215578,\"title\":\"Разведать API Ёжки\",\"projectId\":25072,\"creatorId\":17160,\"statusId\":2,\"typeId\":2,\"createTs\":\"2026-11-21T23:57:34.735772Z\",\"updateTs\":\"2026-11-22T08:58:48.498166Z\",\"code\":\"BMCPTESTX-1\",\"closeTs\":\"2999-12-31T00:00:00Z\",\"parentId\":null,\"priorityId\":3,\"hierarchyLevelId\":2,\"orderNum\":224137000,\"executorsIds\":[],\"observersIds\":[],\"contentData\":\"<p>Описание добавлено через MCP reverse session. Проверяем contentData.</p>\",\"contentDataWithTags\":null,\"deadlineTs\":\"2026-11-25T00:00:00Z\",\"deadlineMarked\":false,\"taskNum\":1,\"attachments\":[],\"backgroundUrl\":null,\"notifications\":[],\"deadlineClTs\":\"2999-12-31T00:00:00Z\",\"tags\":[{\"id\":13715,\"tagName\":\"rev\",\"workspaceId\":18122,\"backgroundColor\":\"var(--color-result_10)\"}],\"checkLists\":[],\"projectCode\":null,\"projectTitle\":null,\"projectIconColor\":null,\"projectIconUrl\":null,\"statusColor\":null,\"statusName\":null,\"deadlineLastClTs\":null,\"entityType\":\"task\",\"totalItemsCheckLists\":null,\"orderNumProjects\":214153000,\"isCompleted\":false,\"completeTs\":\"2999-12-31T00:00:00Z\",\"workspaceCode\":\"REVENG\",\"repeatSetting\":null}],\"totalPages\":1,\"pageNumber\":0,\"elementsOnPage\":9999,\"totalElements\":1}",
+    "status": 200,
+    "url": "https://yozhka.lukit.ru/backend/task/searchByProjectId/25072?page=0&size=9999&searchText=%D0%A0%D0%B0%D0%B7%D0%B2%D0%B5%D0%B4%D0%B0%D1%82%D1%8C"
+  },
+  {
+    "kind": "xhr",
+    "method": "GET",
+    "reqBody": null,
+    "reqHeaders": {},
+    "respBody": "{\"unreadCount\":0,\"page\":1,\"size\":0,\"notifications\":[]}",
+    "status": 200,
+    "url": "https://yozhka.lukit.ru/backend/notifications?page=1&size=20&search="
+  },
+  {
+    "kind": "xhr",
+    "method": "GET",
+    "reqBody": null,
+    "reqHeaders": {},
+    "respBody": "{\"content\":[{\"id\":215578,\"title\":\"Разведать API Ёжки\",\"projectId\":25072,\"creatorId\":17160,\"statusId\":2,\"typeId\":2,\"createTs\":\"2026-11-21T23:57:34.735772Z\",\"updateTs\":\"2026-11-22T08:58:48.498166Z\",\"code\":\"BMCPTESTX-1\",\"closeTs\":\"2999-12-31T00:00:00Z\",\"parentId\":null,\"priorityId\":3,\"hierarchyLevelId\":2,\"orderNum\":224137000,\"executorsIds\":[],\"observersIds\":[],\"contentData\":\"<p>Описание добавлено через MCP reverse session. Проверяем contentData.</p>\",\"contentDataWithTags\":null,\"deadlineTs\":\"2026-11-25T00:00:00Z\",\"deadlineMarked\":false,\"taskNum\":1,\"attachments\":[],\"backgroundUrl\":null,\"notifications\":[],\"deadlineClTs\":\"2999-12-31T00:00:00Z\",\"tags\":[{\"id\":13715,\"tagName\":\"rev\",\"workspaceId\":18122,\"backgroundColor\":\"var(--color-result_10)\"}],\"checkLists\":[],\"projectCode\":null,\"projectTitle\":null,\"projectIconColor\":null,\"projectIconUrl\":null,\"statusColor\":null,\"statusName\":null,\"deadlineLastClTs\":null,\"entityType\":\"task\",\"totalItemsCheckLists\":null,\"orderNumProjects\":214153000,\"isCompleted\":false,\"completeTs\":\"2999-12-31T00:00:00Z\",\"workspaceCode\":\"REVENG\",\"repeatSetting\":null}],\"totalPages\":1,\"pageNumber\":0,\"elementsOnPage\":9999,\"totalElements\":1}",
+    "status": 200,
+    "url": "https://yozhka.lukit.ru/backend/task/25072/list?page=0&size=9999&searchText="
+  }
+]

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
@@ -26,6 +27,7 @@ from .exceptions import (
     ValidationError,
     YozhkaError,
 )
+from .token_store import TokenStore
 
 logger = logging.getLogger("yozhka_mcp")
 
@@ -60,6 +62,13 @@ class YozhkaClient:
         self._access_token: str | None = config.access_token
         self._refresh_token: str | None = config.refresh_token
         self._refresh_lock = asyncio.Lock()
+        self._sem = asyncio.Semaphore(config.max_concurrent)
+        # Вечный режим: берём новейшую пару токенов из кеша на диске; если в .env
+        # положили более свежий токен (fingerprint не совпал) — он выигрывает.
+        self._store = TokenStore(Path(config.token_cache_path)) if config.token_cache_path else None
+        if self._store:
+            self._refresh_token, self._access_token = self._store.load(
+                config.refresh_token, config.access_token)
         self._http = httpx.AsyncClient(
             base_url=config.base_url,
             timeout=config.request_timeout,
@@ -112,16 +121,18 @@ class YozhkaClient:
         if headers:
             req_headers.update(headers)
 
-        response = await self._http.request(
-            method,
-            path,
-            params=params,
-            content=None if files else data,   # с files= поле data уходит как form-field
-            data=data if files else None,
-            json=json_body,
-            headers=req_headers,
-            files=files,
-        )
+        # лимит параллельности: лишние запросы ждут локально, не долбя API
+        async with self._sem:
+            response = await self._http.request(
+                method,
+                path,
+                params=params,
+                content=None if files else data,   # с files= поле data уходит как form-field
+                data=data if files else None,
+                json=json_body,
+                headers=req_headers,
+                files=files,
+            )
 
         # одна повторная попытка после 401: без флага невалидный access + живой refresh = бесконечный цикл
         if response.status_code == 401 and not _is_refresh and not _auth_retried:
@@ -204,6 +215,9 @@ class YozhkaClient:
             self._access_token = access
             if data.get("refreshToken"):
                 self._refresh_token = data["refreshToken"]
+            if self._store:  # вечный режим: новейшая пара токенов — на диск (0600)
+                self._store.save(self._refresh_token, self._access_token,
+                                 self._config.refresh_token)
             logger.info("Access token refreshed")
             return True
 

@@ -33,10 +33,16 @@ class Config:
             raise ValueError(
                 f"YOZHKA_BASE_URL должен быть https://… или http://localhost…, получено: {self.base_url!r}"
             )
-        # Основной способ: refresh-токен (живёт ~30 дней), access получаем сами.
+        # Основной способ: refresh-токен. Ротация бесконечная: каждый refresh выдаёт
+        # новый refresh-токен, он сохраняется в кеш-файл (права 0600) — одна сессия
+        # живёт вечно, пока Ёжку дёргают чаще раза в месяц.
         self.refresh_token: str | None = os.environ.get("YOZHKA_REFRESH_TOKEN") or None
         # Альтернатива: готовый access-токен (живёт ~1 час).
         self.access_token: str | None = os.environ.get("YOZHKA_ACCESS_TOKEN") or None
+        # Кеш цепочки токенов: "" / "off" отключает, иначе путь (по умолчанию — рядом с .env).
+        default_cache = Path(__file__).resolve().parent.parent.parent / ".yozhka-token-cache.json"
+        cache_env = os.environ.get("YOZHKA_TOKEN_CACHE", str(default_cache)).strip()
+        self.token_cache_path: str | None = None if cache_env.lower() in {"", "off", "0", "none"} else cache_env
         self.read_only: bool = _env_bool("YOZHKA_READ_ONLY", default=False)
         self.request_timeout: float = float(os.environ.get("YOZHKA_TIMEOUT", "30"))
         self.max_retries: int = int(os.environ.get("YOZHKA_MAX_RETRIES", "3"))
@@ -49,6 +55,8 @@ class Config:
         # http-режим: если задан, все запросы должны нести Authorization: Bearer <token>
         # или X-MCP-Token. Без токена эндпоинт доступен только с localhost.
         self.http_token: str | None = os.environ.get("YOZHKA_HTTP_TOKEN") or None
+        # Лимит одновременных запросов к API: лишние ждут локально, не долбя сервер.
+        self.max_concurrent: int = int(os.environ.get("YOZHKA_MAX_CONCURRENT", "4"))
 
     @property
     def has_auth(self) -> bool:

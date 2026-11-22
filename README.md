@@ -58,6 +58,55 @@ Claude Desktop — то же самое, но файл называется `~/L
 
 Если что-то не завелось — раздел «Проверка» ниже. Остальные способы запуска (Docker, серверный режим) — не нужны, пока не захочешь.
 
+### Быстрый старт на Windows
+
+Всё то же самое, но по-другому. Работай в PowerShell (Пуск → набери «PowerShell»).
+
+**1. Поставить uv** (и Git, если его нет):
+
+```powershell
+winget install --id astral-sh.uv -e
+winget install --id Git.Git -e          # только если git ещё не установлен
+```
+
+После установки закрой и снова открой PowerShell (чтобы обновился PATH). Проверка: `uv --version` — печатает версию.
+
+**2. Скачать проект и поставить зависимости** (путь будет `C:\Users\ТВОЙ_ЮЗЕР\yozhka-mcp`):
+
+```powershell
+git clone https://github.com/majormnb/YozhkaMCP "$env:USERPROFILE\yozhka-mcp"
+cd "$env:USERPROFILE\yozhka-mcp"
+uv sync
+```
+
+**3. Положить токен.** Токен достаётся так же: https://yozhka.lukit.ru → F12 → Console → `copy(JSON.parse(localStorage.getItem('ejka.refreshToken')))` → он в буфере обмена. Теперь создай файл с токеном:
+
+```powershell
+notepad .env
+```
+
+Notepad спросит «создать файл?» — да. Вставь одну строку (`Cmd+V` — `Ctrl+V`): `YOZHKA_REFRESH_TOKEN=ВСТАВЬ_СЮДА`, сохрани (Ctrl+S), закрой.
+
+**4. Подключить к клиенту** — конфиг такой же, как выше, но пути виндовые, с двойными обратными слешами в JSON:
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "yozhka": {
+        "type": "stdio",
+        "command": "C:\\Users\\ТВОЙ_ЮЗЕР\\.local\\bin\\uv.exe",
+        "args": ["run", "--directory", "C:\\Users\\ТВОЙ_ЮЗЕР\\yozhka-mcp", "yozhka-mcp"]
+      }
+    }
+  }
+}
+```
+
+Путь к `uv.exe` можно проверить командой `(Get-Command uv).Source`. Для Claude Desktop файл `~/Library/...` заменяется на `%APPDATA%\Claude\claude_desktop_config.json` (вставь этот путь в адресную строку Проводника).
+
+**Готово** — перезапусти клиент и спроси у ассистента про задачи в Ёжке.
+
 ## Возможности
 
 61 инструмент, сгруппированный по доменам:

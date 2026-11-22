@@ -139,22 +139,46 @@ async def test_api_error_becomes_readable_tool_error():
 # ---------- подтверждение опасных действий ----------
 
 @respx.mock
-async def test_update_description_requires_confirmation():
-    """Изменение описания без confirm=True НЕ выполняется — возвращается вопрос."""
+async def test_update_description_of_foreign_task_requires_confirmation():
+    """Описание ЧУЖОЙ задачи (creatorId != me) без confirm=True НЕ меняется — вопрос."""
+    respx.get(f"{BASE}/userProfile").respond(json=[{"id": 7, "displayName": "Я"}])
+    respx.get(f"{BASE}/task/code/X-1").respond(json={
+        "id": 1, "code": "X-1", "title": "T", "statusId": 2, "projectId": 5,
+        "creatorId": 999,  # чужая задача
+        "contentData": "<p>старое</p>"})
     put_route = respx.put(f"{BASE}/task").respond(json={"id": 1})
     async with Client(server.mcp) as c:
         r = await c.call_tool("update_task", {
             "task_code": "X-1", "description": "новое описание"})
         data = _data(r)
         assert data["confirmation_required"] is True
-        assert "Вы уверены" in data["message"]
+        assert "создана другим пользователем" in data["message"]
         assert not put_route.called  # ничего не изменено
 
 
 @respx.mock
+async def test_update_description_of_own_task_no_gate():
+    """В СВОЕЙ задаче (creatorId == me) описание меняется без confirm."""
+    respx.get(f"{BASE}/userProfile").respond(json=[{"id": 7, "displayName": "Я"}])
+    respx.get(f"{BASE}/task/code/X-1").respond(json={
+        "id": 1, "code": "X-1", "title": "T", "statusId": 2, "projectId": 5,
+        "creatorId": 7,  # своя задача
+        "contentData": "<p>старое</p>"})
+    put_route = respx.put(f"{BASE}/task").respond(json={
+        "id": 1, "code": "X-1", "contentData": "<p>новое</p>"})
+    async with Client(server.mcp) as c:
+        r = await c.call_tool("update_task", {
+            "task_code": "X-1", "description": "новое"})
+        assert _data(r)["description"] == "новое"
+        assert put_route.called
+
+
+@respx.mock
 async def test_update_description_with_confirm_executes():
+    respx.get(f"{BASE}/userProfile").respond(json=[{"id": 7, "displayName": "Я"}])
     get_route = respx.get(f"{BASE}/task/code/X-1").respond(json={
         "id": 1, "code": "X-1", "title": "T", "statusId": 2, "projectId": 5,
+        "creatorId": 999,
         "contentData": "<p>старое</p>"})
     put_route = respx.put(f"{BASE}/task").respond(json={
         "id": 1, "code": "X-1", "contentData": "<p>новое</p>"})
@@ -180,7 +204,8 @@ async def test_update_title_only_no_confirmation():
 @respx.mock
 async def test_delete_task_requires_confirmation():
     delete_route = respx.delete(f"{BASE}/task/1").respond(json={})
-    respx.get(f"{BASE}/task/code/X-1").respond(json={"id": 1, "code": "X-1", "title": "Важная"})
+    respx.get(f"{BASE}/task/code/X-1").respond(json={
+        "id": 1, "code": "X-1", "title": "Важная", "creatorId": 7})
     async with Client(server.mcp) as c:
         r = await c.call_tool("delete_task", {"task_code": "X-1"})
         data = _data(r)

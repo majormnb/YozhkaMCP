@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
 
 from ..api.client import YozhkaClient
-from ._shared import write_guard
+from ._shared import page_info, run, write_guard
 
 
 def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
@@ -25,7 +26,7 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
         """[write] Создать пространство. Код сгенерируется автоматически по названию."""
         async def _fn():
             return await client.create_workspace(title=title, description=description)
-        return await write_guard(read_only, _fn)()
+        return await run(write_guard(read_only, _fn))
 
     @mcp.tool
     async def update_workspace(code: str, title: str | None = None, description: str | None = None) -> dict:
@@ -37,7 +38,7 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
             if description is not None:
                 ws["description"] = description
             return await client.update_workspace(ws)
-        return await write_guard(read_only, _fn)()
+        return await run(write_guard(read_only, _fn))
 
     @mcp.tool
     async def list_workspace_users(workspace_id: int) -> list:
@@ -46,14 +47,17 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
 
     @mcp.tool
     async def invite_workspace_users(workspace_id: int, mails: list[str], role: str = "Участник") -> dict:
-        """[write] Пригласить участников по email. Роль: 'Участник' | 'Администратор'."""
+        """[write] Пригласить участников по email. Роль: 'Участник' | 'Администратор' | 'Владелец' (list_workspace_roles)."""
         async def _fn():
             roles = await client.list_workspace_roles()
             role_map = {r["roleName"]: r["roleId"] for r in roles}
-            role_id = role_map.get(role, role_map.get("Участник", 16))
-            await client.invite_workspace_users(workspace_id, mails, role_id)
+            if role not in role_map:
+                raise ToolError(
+                    f"Неизвестная роль: {role!r}. Доступны: {sorted(role_map)} (list_workspace_roles)"
+                )
+            await client.invite_workspace_users(workspace_id, mails, role_map[role])
             return {"invited": mails, "role": role}
-        return await write_guard(read_only, _fn)()
+        return await run(write_guard(read_only, _fn))
 
     @mcp.tool
     async def list_workspace_roles() -> list:
@@ -66,13 +70,15 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
         return await client.get_workspace_limits(workspace_id)
 
     @mcp.tool
-    async def list_tags(workspace_id: int, search: str | None = None) -> dict:
-        """[read-only] Метки пространства: {content: [{id, tagName, backgroundColor}]}."""
-        return await client.list_tags(workspace_id, search=search)
+    async def list_tags(workspace_id: int, search: str | None = None, page: int = 0) -> dict:
+        """[read-only] Метки пространства: {content: [{id, tagName, backgroundColor}]} + пагинация."""
+        result = await client.list_tags(workspace_id, search=search, page=page)
+        result["page"] = page_info(result)
+        return result
 
     @mcp.tool
     async def create_tag(workspace_id: int, tag_name: str) -> dict:
         """[write] Создать метку в пространстве."""
         async def _fn():
             return await client.create_tag(workspace_id, tag_name)
-        return await write_guard(read_only, _fn)()
+        return await run(write_guard(read_only, _fn))

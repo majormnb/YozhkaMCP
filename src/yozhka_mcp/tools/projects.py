@@ -3,17 +3,21 @@
 from __future__ import annotations
 
 from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
 
 from ..api import endpoints as ep
 from ..api.client import YozhkaClient
-from ._shared import write_guard
+from ._shared import run, write_guard
 
 
 def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
 
     @mcp.tool
-    async def list_projects(workspace_id: int, state: str = "active", page: int = 1, size: int = 50) -> dict:
+    async def list_projects(workspace_id: int, state: str = "active", page: int = 1,
+                            size: int = 50) -> dict:
         """[read-only] Проекты пространства. state: active | favorite | archive."""
+        if state not in ("active", "favorite", "archive"):
+            raise ToolError(f"state должен быть active|favorite|archive, получено: {state!r}")
         return await client.list_projects(workspace_id, state_filter=state, page=page, size=size)
 
     @mcp.tool
@@ -26,7 +30,7 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
         """[write] Создать проект в пространстве (код сгенерируется по названию)."""
         async def _fn():
             return await client.create_project(workspace_id, title, description)
-        return await write_guard(read_only, _fn)()
+        return await run(write_guard(read_only, _fn))
 
     @mcp.tool
     async def update_project(code: str, workspace_id: int, title: str | None = None,
@@ -39,7 +43,7 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
             if description is not None:
                 project["description"] = description
             return await client.update_project(project)
-        return await write_guard(read_only, _fn)()
+        return await run(write_guard(read_only, _fn))
 
     @mcp.tool
     async def archive_project(workspace_id: int, project_id: int) -> dict:
@@ -47,7 +51,7 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
         async def _fn():
             await client.set_project_state(workspace_id, project_id, ep.PROJECT_STATE_ARCHIVE)
             return {"projectId": project_id, "state": "archived"}
-        return await write_guard(read_only, _fn)()
+        return await run(write_guard(read_only, _fn))
 
     @mcp.tool
     async def restore_project(workspace_id: int, project_id: int) -> dict:
@@ -55,7 +59,7 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
         async def _fn():
             await client.set_project_state(workspace_id, project_id, ep.PROJECT_STATE_ACTIVE)
             return {"projectId": project_id, "state": "active"}
-        return await write_guard(read_only, _fn)()
+        return await run(write_guard(read_only, _fn))
 
     @mcp.tool
     async def toggle_project_favorite(project_id: int) -> dict:
@@ -63,7 +67,7 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
         async def _fn():
             await client.toggle_project_favorite(project_id)
             return {"projectId": project_id, "favorite": "toggled"}
-        return await write_guard(read_only, _fn)()
+        return await run(write_guard(read_only, _fn))
 
     @mcp.tool
     async def list_project_users(project_id: int) -> list:

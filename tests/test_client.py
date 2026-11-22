@@ -7,12 +7,13 @@ import pytest
 import respx
 
 from yozhka_mcp.api.client import YozhkaClient
+from yozhka_mcp.api.exceptions import AuthError
 from yozhka_mcp.config import Config
 
 BASE = "https://yozhka.lukit.ru/backend"
 
 
-def _client(monkeypatch, **kwargs) -> YozhkaClient:
+def _client(**kwargs) -> YozhkaClient:
     cfg = Config.__new__(Config)
     cfg.base_url = BASE
     cfg.access_token = "test-access"
@@ -29,7 +30,7 @@ def _client(monkeypatch, **kwargs) -> YozhkaClient:
 @respx.mock
 async def test_bearer_header_sent():
     respx.get(f"{BASE}/userProfile").respond(json={"id": 1, "mail": "a@b.c"})
-    c = _client(None)
+    c = _client()
     data = await c.get_my_profile()
     assert data["id"] == 1
     request = respx.calls.last.request
@@ -40,7 +41,7 @@ async def test_bearer_header_sent():
 @respx.mock
 async def test_list_projects_state_filter():
     route = respx.get(f"{BASE}/project/tiles/my").respond(json={"content": [{"id": 5, "title": "P"}], "totalElements": 1})
-    c = _client(None)
+    c = _client()
     result = await c.list_projects(workspace_id=18122, state_filter="archive")
     assert result["totalElements"] == 1
     assert "archive" in str(route.calls.last.request.url)
@@ -56,7 +57,7 @@ async def test_refresh_on_401():
         ]
     )
     refresh = respx.post(f"{BASE}/auth/refresh").respond(json={"accessToken": "new-access", "refreshToken": "new-refresh"})
-    c = _client(None)
+    c = _client()
     data = await c.get_my_profile()
     assert data["id"] == 7
     assert c._access_token == "new-access"
@@ -65,10 +66,34 @@ async def test_refresh_on_401():
 
 
 @respx.mock
+async def test_401_loop_is_bounded():
+    """Регресс: невалидный access + живой refresh не должны давать бесконечный цикл."""
+    respx.get(f"{BASE}/userProfile").respond(401, json={"error": "expired"})
+    respx.post(f"{BASE}/auth/refresh").respond(json={"accessToken": "still-bad", "refreshToken": "r"})
+    c = _client()
+    with pytest.raises(AuthError):
+        await c.get_my_profile()
+    # один исходный запрос + ровно один повтор после refresh
+    assert respx.calls.call_count >= 2
+    gets = [r for r in respx.calls if r.request.url.path.endswith("/userProfile")]
+    assert len(gets) == 2
+    await c.aclose()
+
+
+@respx.mock
+async def test_refresh_empty_access_token_raises():
+    respx.post(f"{BASE}/auth/refresh").respond(json={"accessToken": None, "refreshToken": "r"})
+    c = _client(access_token=None)
+    with pytest.raises(AuthError):
+        await c.get_my_profile()
+    await c.aclose()
+
+
+@respx.mock
 async def test_auth_error_without_tokens():
     respx.post(f"{BASE}/auth/refresh").respond(401, json={})
-    c = _client(None, access_token=None, refresh_token=None)
-    with pytest.raises(Exception):
+    c = _client(access_token=None, refresh_token=None)
+    with pytest.raises(AuthError):
         await c.get_my_profile()
     await c.aclose()
 
@@ -77,7 +102,7 @@ async def test_auth_error_without_tokens():
 async def test_404_maps_to_not_found():
     respx.get(f"{BASE}/task/code/NOPE-1").respond(404, json={"message": "not found"})
     from yozhka_mcp.api.exceptions import NotFoundError
-    c = _client(None)
+    c = _client()
     with pytest.raises(NotFoundError):
         await c.get_task("NOPE-1")
     await c.aclose()

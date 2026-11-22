@@ -1,50 +1,73 @@
 """Каталог реверснутых эндпоинтов API Ёжки.
 
-Единственное место, где живут пути API. Если сервис изменит API —
-правим только этот файл (см. research/endpoints.md для контекста).
+Единственное место, где живут пути API. Источник: research/endpoints.md
+(реверс через браузер 2026-11-22). При drift API правим только этот файл.
 
-Base URL: https://yozhka.lukit.ru/backend  (см. config.DEFAULT_BASE_URL)
+Base URL: https://yozhka.lukit.ru/backend  (config.DEFAULT_BASE_URL)
 """
 
-# --- Auth (Keycloak SSO) ---
-AUTH_ENTRY = "/auth"            # точка входа SSO (public, ?redirectUrl=)
-AUTH_LOGIN = "/auth/login"
-AUTH_REFRESH = "/auth/refresh"
+# --- Auth (Keycloak, realm bun) ---
+AUTH_REFRESH = "/auth/refresh"   # POST {refreshToken} -> {accessToken, refreshToken}
 AUTH_ME = "/auth/me"
-AUTH_TOKEN = "/auth/token"
-AUTH_LOGOUT = "/auth/logout"
+
+# --- Workspaces ---
+WORKSPACE_GENERATE_MCODE = "/workspace/generateMCode"      # POST "Название" -> "CODE"
+WORKSPACE = "/workspace"                                   # POST create / PUT update
+WORKSPACE_MY = "/workspace/my"                             # GET ?page=1&size=
+WORKSPACE_BY_CODE = "/workspace/{code}"                    # GET / DELETE(?)
+WORKSPACE_USERS = "/workspace/{workspace_id}/users"        # GET
+WORKSPACE_ADD_USERS = "/workspaces/{workspace_id}/addUsers"  # POST {mails, roleId} — ВНИМАНИЕ: мн.ч.!
+WORKSPACE_ROLE_LIST = "/workspace/role/list"               # GET
+WORKSPACE_LIMITS = "/workspaceSubscription/{workspace_id}/limits"  # GET
+SUBSCRIPTION_TYPES = "/workspaceSubscription/subscriptionType/list"  # GET
+
+# --- Workspace tags ---
+WORKSPACE_TAG = "/workspaceTag/{workspace_id}"             # GET ?page&size&search
+WORKSPACE_TAG_CREATE = "/workspaceTag"                     # POST {tagName, workspaceId, backgroundColor}
 
 # --- Projects ---
-PROJECT_LIST = "/project/list"
-PROJECT_LIST_MY = "/project/list/my"
-PROJECT_TILES_MY = "/project/tiles/my"
-PROJECT_TITLES_MY = "/project/titles/my"
-PROJECT_SEARCH = "/project/search/{query}"
-PROJECT_BY_CODE = "/project/code/{code}"
-PROJECT_GENERATE_MCODE = "/project/generateMCode"
-PROJECT_DETAIL = "/project/{project_id}"
-PROJECT_UPDATE_STATE = "/project/updateProjectState"
-PROJECT_FAVORITES = "/project/favorites/{project_id}"
-PROJECT_ADD_USERS = "/project/{project_id}/addUsers"
-PROJECT_DELETE_USER = "/project/{project_id}/deleteUser"
-PROJECT_USERS = "/project/{project_id}/users"
-PROJECT_ACTIVE_USERS = "/project/{project_id}/activeUsers"
-PROJECT_ROLE = "/project/role"
+PROJECT_GENERATE_MCODE = "/project/generateMCode"          # POST ?projectName=&workspaceId=
+PROJECT = "/project"                                       # POST create / PUT update
+PROJECT_TILES_MY = "/project/tiles/my"                     # GET ?workspaceId=&stateFilter=
+PROJECT_TITLES_MY = "/project/titles/my"                   # GET (компактный)
+PROJECT_BY_CODE = "/project/code/{code}/{workspace_id}"    # GET
+PROJECT_BY_ID = "/project/{project_id}/{workspace_id}"     # GET
+PROJECT_UPDATE_STATE = "/project/updateProjectState"       # POST ?workspaceId&projectId&targetProjectStateId (1|2)
+PROJECT_FAVORITES = "/project/favorites/{project_id}"      # POST toggle
+PROJECT_USERS = "/project/{project_id}/users"              # GET
+PROJECT_ACTIVE_USERS = "/project/{project_id}/activeUsers" # GET
 
-# --- Users / profiles ---
-USER_PROFILE = "/userProfile"
-USER_PROFILE_FIND = "/userProfile/find/{query}"
-USER_PROFILE_FIND_BY_IDS = "/userProfile/findByIds"
-USER_PROFILE_FIND_BY_EMAILS = "/userProfile/findByEmails"
-USER_PROFILE_SAVE = "/userProfile/save"
-USER_PROFILE_SAVE_EXTERNAL = "/userProfile/saveExternal"
+# --- Канбан-колонки (статусы) ---
+WORKFLOW_STATUSES = "/workflowStatusesAvail"               # GET ?projectId= / POST / PUT / DELETE
 
-# --- Attachments (attacher-сервис) ---
-ATTACHMENT_LIST = "/getAttachment/list"
+# --- Tasks ---
+TASK = "/task"                                             # POST ?onTop=true / PUT (полный объект)
+TASK_LIST = "/task/{project_id}/list"                      # GET ?page=0&size=&searchText=
+TASK_SEARCH = "/task/searchByProjectId/{project_id}"       # GET ?searchText=
+TASK_BY_CODE = "/task/code/{task_code}"                    # GET
+TASK_BY_ID = "/task/{task_id}"                             # DELETE
+TASK_PRIORITY = "/taskPriority"                            # GET
+TASK_HISTORY = "/task/{task_id}/history"                   # GET ?page=0&size=
 
-# --- Прочее ---
-TASK_ASSIGNEE_CNT = "/taskAssignee/cnt/{user_id}"
-FEEDBACK = "/feedback"
+# --- Чек-листы ---
+CHECKLIST_LIST = "/checklist/{task_id}/list"               # GET ?page=0&size=&searchText=
+CHECKLIST = "/checklist"                                   # POST {taskId, itemTitle, ...}
+CHECKLIST_MARK = "/checklist/mark/{item_id}"               # POST {itemId, taskId, returnValue}
 
-# --- Tasks / columns / comments ---
-# ЗАПОЛНЯЕТСЯ ПО РЕЗУЛЬТАТАМ РЕВЕРСА ЧЕРЕЗ БРАУЗЕР (research/endpoints.md)
+# --- Комментарии ---
+COMMENT_LIST = "/comment/{task_id}/list"                   # GET ?page=0&size=&search=&filter={}
+COMMENT = "/comment"                                       # POST {contentComment, taskId, ...}
+
+# --- Пользователи ---
+USER_PROFILE = "/userProfile"                              # GET (мой профиль)
+USER_PROFILE_FIND = "/userProfile/find/{email}"            # GET
+
+# --- Уведомления ---
+NOTIFICATIONS = "/notifications"                           # GET ?page=1&size=&search=
+
+# --- Значения справочников ---
+PROJECT_STATE_ACTIVE = 1
+PROJECT_STATE_ARCHIVE = 2
+TASK_TYPE_DEFAULT = 2
+HIERARCHY_LEVEL_DEFAULT = 2
+FOREVER = "2999-12-31T00:00:00Z"

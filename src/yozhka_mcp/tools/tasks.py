@@ -7,7 +7,7 @@ from fastmcp.exceptions import ToolError
 
 from ..api import endpoints as ep
 from ..api.client import YozhkaClient
-from ._shared import (compact, html_with_mentions, page_info, run, strip_html,
+from ._shared import (compact, render_html, page_info, run, strip_html,
                       write_guard)
 
 
@@ -68,11 +68,11 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
         """[write] Создать задачу. priority: 'Низкий'|'Средний'|'Высокий'|'Критичный'.
         status_id — из list_board_columns ЭТОГО проекта (id колонок уникальны per-project);
         по умолчанию первая колонка. deadline: 'YYYY-MM-DD' (23:59:59 по Москве).
-        В description упоминания: @[email] → живой тег."""
+        В description: @[email] → живой тег, [текст](https://…) → живая ссылка."""
         async def _fn():
             priority_id = await _priority_id(client, priority)
             deadline_ts = _deadline_to_ts(deadline) if deadline else None
-            body = await html_with_mentions(description, client.find_user_by_email) if description else ""
+            body = await render_html(description, client.find_user_by_email) if description else ""
             task = await client.create_task(
                 project_id, title, description=body, priority_id=priority_id,
                 status_id=status_id, deadline_ts=deadline_ts,
@@ -82,13 +82,13 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
 
     @mcp.tool
     async def update_task(task_code: str, title: str | None = None, description: str | None = None) -> dict:
-        """[write] Изменить название и/или описание задачи. В description упоминания: @[email] → живой тег."""
+        """[write] Изменить название и/или описание задачи. В description: @[email] → живой тег, [текст](https://…) → живая ссылка."""
         async def _fn():
             task = await client.get_task(task_code)
             if title is not None:
                 task["title"] = title
             if description is not None:
-                task["contentData"] = await html_with_mentions(description, client.find_user_by_email)
+                task["contentData"] = await render_html(description, client.find_user_by_email)
             updated = await client.update_task(task)
             result = compact(updated)
             result["description"] = strip_html(updated.get("contentData"))

@@ -417,7 +417,7 @@ class YozhkaClient:
                                    params={"page": 0, "size": 9999, "searchText": ""})
 
     async def add_checklist_item(self, task_id: int, title_html: str, order_num: int = 1) -> dict:
-        """title_html — готовый HTML (tools/_shared.html_with_mentions)."""
+        """title_html — готовый HTML (tools/_shared.render_html)."""
         return await self._request("POST", ep.CHECKLIST,
                                    json_body=bodies.checklist_body(task_id, title_html, order_num))
 
@@ -448,7 +448,7 @@ class YozhkaClient:
                                    params={"page": page, "size": size, "search": "", "filter": "{}"})
 
     async def add_comment(self, task_id: int, creator_id: int, text_html: str, reply_to: int | None = None) -> dict:
-        """text_html — готовый HTML (tools/_shared.html_with_mentions)."""
+        """text_html — готовый HTML (tools/_shared.render_html)."""
         return await self._request("POST", ep.COMMENT,
                                    json_body=bodies.comment_body(task_id, creator_id, text_html, reply_to))
 

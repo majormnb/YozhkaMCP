@@ -57,7 +57,8 @@ CHECKLIST_ITEM = "/checklist/{item_id}"                    # DELETE пункт
 
 # --- Комментарии ---
 COMMENT_LIST = "/comment/{task_id}/list"                   # GET ?page=0&size=&search=&filter={}
-COMMENT = "/comment"                                       # POST {contentComment, taskId, ...}
+COMMENT = "/comment"                                       # POST создать, PUT полный объект комментария
+COMMENT_ITEM = "/comment/{comment_id}"                     # DELETE
 
 # --- Пользователи ---
 USER_PROFILE = "/userProfile"                              # GET (мой профиль)

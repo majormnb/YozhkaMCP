@@ -4,9 +4,73 @@
 
 У Ёжки нет публичного API, поэтому сервер работает через внутренний REST API веб-приложения (`yozhka.lukit.ru/backend`), reverse-engineering от ноября 2026. API может измениться без предупреждения. Для личного использования; проект не связан с Лукит/Ростелеком.
 
-## Быстрый старт (4 шага)
+## Установка на Windows
 
-Нужен macOS с [Homebrew](https://brew.sh). Каждый шаг — копипаста в Терминал.
+Работай в PowerShell (Пуск → набери «PowerShell»). Каждый шаг — копипаста.
+
+**1. Поставить uv** (и Git, если его нет). Через winget:
+
+```powershell
+winget install --id astral-sh.uv -e
+winget install --id Git.Git -e          # только если git ещё не установлен
+```
+
+или через Chocolatey, если она у тебя уже стоит:
+
+```powershell
+choco install uv -y
+choco install git -y                    # только если git ещё не установлен
+```
+
+После установки закрой и снова открой PowerShell (чтобы обновился PATH). Проверка: `uv --version` — печатает версию.
+
+**2. Скачать проект и поставить зависимости** (путь будет `C:\Users\ТВОЙ_ЮЗЕР\yozhka-mcp`):
+
+```powershell
+git clone https://github.com/majormnb/YozhkaMCP "$env:USERPROFILE\yozhka-mcp"
+cd "$env:USERPROFILE\yozhka-mcp"
+uv sync
+```
+
+**3. Положить токен.** Открой https://yozhka.lukit.ru, войди, нажми F12 → вкладка Console → вставь туда:
+
+```js
+copy(JSON.parse(localStorage.getItem('ejka.refreshToken')))
+```
+
+Токен скопировался в буфер обмена. Теперь создай файл с токеном:
+
+```powershell
+notepad .env
+```
+
+Notepad спросит «создать файл?» — да. Вставь одну строку (Ctrl+V): `YOZHKA_REFRESH_TOKEN=ВСТАВЬ_СЮДА`, сохрани (Ctrl+S), закрой.
+
+**4. Подключить к своему AI-клиенту** — пути виндовые, с двойными обратными слешами в JSON:
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "yozhka": {
+        "type": "stdio",
+        "command": "C:\\Users\\ТВОЙ_ЮЗЕР\\.local\\bin\\uv.exe",
+        "args": ["run", "--directory", "C:\\Users\\ТВОЙ_ЮЗЕР\\yozhka-mcp", "yozhka-mcp"]
+      }
+    }
+  }
+}
+```
+
+ZCode — этот блок в `C:\Users\ТВОЙ_ЮЗЕР\.zcode\cli\config.json`. Claude Desktop — в `%APPDATA%\Claude\claude_desktop_config.json` (вставь этот путь в адресную строку Проводника), там ключ `mcpServers` вместо `mcp.servers` (примеры ниже, в разделе «Подключение к клиентам»).
+
+В двух местах замени на своё: `ТВОЙ_ЮЗЕР` — твоё имя в Windows (видно в PowerShell до `>`), а если `command` не сработает — проверь путь командой `(Get-Command uv).Source` и вставь то, что она напечатает.
+
+**Готово.** Перезапусти клиент — у ассистента появятся инструменты Ёжки (проверить: «сколько у меня задач в Ёжке?»).
+
+## Установка на macOS
+
+Нужен [Homebrew](https://brew.sh). Каждый шаг — копипаста в Терминал.
 
 **1. Поставить uv** (менеджер Python-окружений, один раз):
 
@@ -20,13 +84,7 @@ brew install uv
 git clone https://github.com/majormnb/YozhkaMCP ~/yozhka-mcp && cd ~/yozhka-mcp && uv sync
 ```
 
-**3. Положить токен.** Открой https://yozhka.lukit.ru, войди, нажми F12 → вкладка Console → вставь туда:
-
-```js
-copy(JSON.parse(localStorage.getItem('ejka.refreshToken')))
-```
-
-Токен скопировался в буфер. Теперь в терминале (вместо `ВСТАВЬ_СЮДА` — твой скопированный токен, вставляется Cmd+V):
+**3. Положить токен.** Токен достаётся так же, как на Windows: https://yozhka.lukit.ru → F12 → Console → `copy(JSON.parse(localStorage.getItem('ejka.refreshToken')))` → он в буфере. Теперь в терминале (вместо `ВСТАВЬ_СЮДА` — твой скопированный токен, вставляется Cmd+V):
 
 ```bash
 echo 'YOZHKA_REFRESH_TOKEN=ВСТАВЬ_СЮДА' > .env
@@ -54,65 +112,9 @@ Claude Desktop — то же самое, но файл называется `~/L
 
 В двух местах замени на своё: `ТВОЙ_ЮЗЕР` — твоё имя на Mac (видно в Терминале до `@`), а если `command` не сработает — проверь путь командой `which uv` и вставь то, что она напечатает.
 
-**Готово.** Перезапусти клиент — у ассистента появятся инструменты Ёжки (проверить: «сколько у меня задач в Ёжке?»).
+**Готово.** Перезапусти клиент и спроси у ассистента про задачи в Ёжке.
 
 Если что-то не завелось — раздел «Проверка» ниже. Остальные способы запуска (Docker, серверный режим) — не нужны, пока не захочешь.
-
-### Быстрый старт на Windows
-
-Всё то же самое, но по-другому. Работай в PowerShell (Пуск → набери «PowerShell»).
-
-**1. Поставить uv** (и Git, если его нет). Через winget:
-
-```powershell
-winget install --id astral-sh.uv -e
-winget install --id Git.Git -e          # только если git ещё не установлен
-```
-
-или через Chocolatey, если она у тебя уже стоит:
-
-```powershell
-choco install uv -y
-choco install git -y                    # только если git ещё не установлен
-```
-
-После установки закрой и снова открой PowerShell (чтобы обновился PATH). Проверка: `uv --version` — печатает версию.
-
-**2. Скачать проект и поставить зависимости** (путь будет `C:\Users\ТВОЙ_ЮЗЕР\yozhka-mcp`):
-
-```powershell
-git clone https://github.com/majormnb/YozhkaMCP "$env:USERPROFILE\yozhka-mcp"
-cd "$env:USERPROFILE\yozhka-mcp"
-uv sync
-```
-
-**3. Положить токен.** Токен достаётся так же: https://yozhka.lukit.ru → F12 → Console → `copy(JSON.parse(localStorage.getItem('ejka.refreshToken')))` → он в буфере обмена. Теперь создай файл с токеном:
-
-```powershell
-notepad .env
-```
-
-Notepad спросит «создать файл?» — да. Вставь одну строку (`Cmd+V` — `Ctrl+V`): `YOZHKA_REFRESH_TOKEN=ВСТАВЬ_СЮДА`, сохрани (Ctrl+S), закрой.
-
-**4. Подключить к клиенту** — конфиг такой же, как выше, но пути виндовые, с двойными обратными слешами в JSON:
-
-```json
-{
-  "mcp": {
-    "servers": {
-      "yozhka": {
-        "type": "stdio",
-        "command": "C:\\Users\\ТВОЙ_ЮЗЕР\\.local\\bin\\uv.exe",
-        "args": ["run", "--directory", "C:\\Users\\ТВОЙ_ЮЗЕР\\yozhka-mcp", "yozhka-mcp"]
-      }
-    }
-  }
-}
-```
-
-Путь к `uv.exe` можно проверить командой `(Get-Command uv).Source`. Для Claude Desktop файл `~/Library/...` заменяется на `%APPDATA%\Claude\claude_desktop_config.json` (вставь этот путь в адресную строку Проводника).
-
-**Готово** — перезапусти клиент и спроси у ассистента про задачи в Ёжке.
 
 ## Возможности
 
@@ -134,23 +136,10 @@ Notepad спросит «создать файл?» — да. Вставь од�
 
 ## Требования
 
-- Python 3.11+
-- [uv](https://docs.astral.sh/uv/) (менеджер окружений; на macOS ставится через `brew install uv`)
+- Windows 10/11 или macOS
+- [uv](https://docs.astral.sh/uv/) (ставится в разделе «Установка» под твою ОС) — сам подтянет Python 3.11+, отдельно Python ставить не нужно
+- Git (Windows: ставится той же командой winget/choco; macOS: входит в Xcode Command Line Tools)
 - Учётная запись Ёжки с доступом к веб-версии
-
-## Установка
-
-```bash
-git clone <repo> ~/yozhka-mcp
-cd ~/yozhka-mcp
-uv sync
-```
-
-`uv sync` создаст виртуальное окружение и поставит зависимости. Проверить, что всё собралось:
-
-```bash
-uv run pytest
-```
 
 ## Токен
 

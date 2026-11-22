@@ -25,6 +25,10 @@ SUBSCRIPTION_TYPES = "/workspaceSubscription/subscriptionType/list"  # GET
 WORKSPACE_TAG = "/workspaceTag/{workspace_id}"             # GET ?page&size&search
 WORKSPACE_TAG_CREATE = "/workspaceTag"                     # POST {tagName, workspaceId, backgroundColor}
 
+# --- Магические значения API (выяснены живыми запросами) ---
+ROLE_PARTICIPANT_ID = 16          # id роли «Участник» — дефолт для приглашений
+TAG_DEFAULT_COLOR = "var(--color-result_10)"  # дефолтный цвет метки, как в веб-интерфейсе
+
 # --- Projects ---
 PROJECT_GENERATE_MCODE = "/project/generateMCode"          # POST ?projectName=&workspaceId=
 PROJECT = "/project"                                       # POST create / PUT update

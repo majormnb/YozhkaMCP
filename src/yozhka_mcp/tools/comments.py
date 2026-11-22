@@ -5,18 +5,19 @@ from __future__ import annotations
 from fastmcp import FastMCP
 
 from ..api.client import YozhkaClient
-from ._shared import html_with_mentions, run, strip_html, write_guard
+from ._shared import html_with_mentions, page_info, run, strip_html, write_guard
 
 
 def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
 
     @mcp.tool
-    async def list_comments(task_code: str, size: int = 20) -> dict:
+    async def list_comments(task_code: str, page: int = 0, size: int = 20) -> dict:
         """[read-only] Комментарии задачи (новые сверху, пагинация)."""
         task = await client.get_task(task_code)
-        result = await client.list_comments(task["id"], size=size)
+        result = await client.list_comments(task["id"], page=page, size=size)
         for c in result.get("content", []):
             c["text"] = strip_html(c.get("contentComment"))
+        result["page"] = page_info(result)
         return result
 
     @mcp.tool

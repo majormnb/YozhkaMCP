@@ -16,7 +16,7 @@ from tenacity import (
 )
 
 from ..config import Config, config as app_config
-from . import endpoints as ep
+from . import bodies, endpoints as ep
 from .exceptions import (
     ApiError,
     AuthError,
@@ -348,44 +348,21 @@ class YozhkaClient:
     ) -> dict:
         # Статусы уникальны для проекта (кастомные колонки меняют id) — резолвим из живого воркфлоу
         columns = await self.list_columns(project_id)
-        valid_ids = {c["id"] for c in columns}
-        if status_id is None or status_id not in valid_ids:
-            first = min(columns, key=lambda c: c.get("orderNum", 0))
-            status_id = first["id"]
-        body = {
-            "title": title,
-            "projectId": project_id,
-            "projectCode": "", "projectTitle": "", "projectIconColor": "", "projectIconUrl": "",
-            "code": "",
-            "hierarchyLevelId": ep.HIERARCHY_LEVEL_DEFAULT,
-            "priorityId": priority_id,
-            "statusId": status_id,
-            "statusColor": "", "statusName": "",
-            "typeId": ep.TASK_TYPE_DEFAULT,
-            "contentData": description,  # готовый HTML: экранирование и упоминания — в tools/_shared.html_with_mentions
-            "attachments": [],
-            "orderNum": 0,
-            "executorsIds": executors_ids or [],
-            "observersIds": [],
-            "notifications": [],
-            "tags": tags or [],
-            "entityType": "task",
-            "isNew": False,
-            "calendarId": None,
-            "contentDataWithTags": "",
-            "orderNumProjects": 0,
-            "isCompleted": False,
-            "workspaceCode": "",
-            "repeatSetting": {
-                "id": -1, "taskId": -1, "enabled": False, "type": "COPY",
-                "targetStatusId": -1, "period": "DAILY", "workdaysOnly": True,
-                "daysOfWeek": {"monday": True, "tuesday": False, "wednesday": False,
-                               "thursday": False, "friday": False, "saturday": False, "sunday": False},
-                "customValue": 1, "customPeriod": "DAY", "anchorDay": 1,
-            },
-        }
-        if deadline_ts:
-            body["deadlineTs"] = deadline_ts
+        if not columns:
+            raise YozhkaError(f"У проекта {project_id} нет колонок (workflowStatusesAvail пуст)")
+        if status_id is None:
+            status_id = min(columns, key=lambda c: c.get("orderNum", 0))["id"]
+        elif status_id not in {c["id"] for c in columns}:
+            valid = sorted(c["id"] for c in columns)
+            raise YozhkaError(
+                f"status_id={status_id} не существует в проекте {project_id}; "
+                f"доступны {valid} (list_board_columns)"
+            )
+        body = bodies.task_body(
+            project_id, title, status_id=status_id, description_html=description,
+            priority_id=priority_id, executors_ids=executors_ids,
+            deadline_ts=deadline_ts, tags=tags,
+        )
         return await self._request("POST", ep.TASK, params={"onTop": "true"}, json_body=body)
 
     async def update_task(self, task: dict) -> dict:
@@ -410,21 +387,8 @@ class YozhkaClient:
 
     async def add_checklist_item(self, task_id: int, title_html: str, order_num: int = 1) -> dict:
         """title_html — готовый HTML (tools/_shared.html_with_mentions)."""
-        return await self._request("POST", ep.CHECKLIST, json_body={
-            "taskId": task_id,
-            "taskTitle": "", "taskCode": "", "taskStatusColor": "", "taskStatusName": "",
-            "orderNum": order_num,
-            "itemTitle": title_html,
-            "itemAuthor": -1,
-            "createTs": None, "updateTs": None,
-            "markBy": None, "markTs": None, "markComment": None,
-            "deadlineClTs": None, "itemChecked": False,
-            "totalItemsCheckLists": 0,
-            "entityType": "checklist",
-            "itemTitleWithTags": "",
-            "calendarId": None,
-            "executorsIds": [],
-        })
+        return await self._request("POST", ep.CHECKLIST,
+                                   json_body=bodies.checklist_body(task_id, title_html, order_num))
 
     async def mark_checklist_item(self, item_id: int, task_id: int, checked: bool) -> dict:
         # Коварность API: returnValue = СТАРОЕ значение чекбокса, сервер инвертирует его
@@ -454,16 +418,8 @@ class YozhkaClient:
 
     async def add_comment(self, task_id: int, creator_id: int, text_html: str, reply_to: int | None = None) -> dict:
         """text_html — готовый HTML (tools/_shared.html_with_mentions)."""
-        return await self._request("POST", ep.COMMENT, json_body={
-            "contentComment": text_html,
-            "creatorId": creator_id,
-            "replyTo": reply_to,
-            "taskId": task_id,
-            "attachments": [],
-            "attachIsPending": False,
-            "replyToComment": {"replyText": ""},
-            "contentCommentWithTags": "",
-        })
+        return await self._request("POST", ep.COMMENT,
+                                   json_body=bodies.comment_body(task_id, creator_id, text_html, reply_to))
 
     async def get_comment(self, task_id: int, comment_id: int) -> dict:
         result = await self.list_comments(task_id, size=9999)
@@ -484,7 +440,9 @@ class YozhkaClient:
     async def get_my_profile(self) -> dict:
         result = await self._request("GET", ep.USER_PROFILE)
         if isinstance(result, list):  # API возвращает массив с одним элементом
-            return result[0] if result else {}
+            if not result:
+                raise AuthError("Профиль не получен: пустой ответ /userProfile — проверьте токен")
+            return result[0]
         return result
 
     async def find_user_by_email(self, email: str) -> list:

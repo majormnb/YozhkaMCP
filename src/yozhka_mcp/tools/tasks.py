@@ -3,26 +3,50 @@
 from __future__ import annotations
 
 from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
 
 from ..api import endpoints as ep
 from ..api.client import YozhkaClient
-from ._shared import compact, html_with_mentions, run, strip_html, wrap_html, write_guard
+from ._shared import (compact, html_with_mentions, page_info, run, strip_html,
+                      write_guard)
+
+
+def _deadline_to_ts(deadline: str) -> str:
+    """'YYYY-MM-DD' -> ISO с 23:59:59 по Москве (MSK, +03:00) — таймзона hardcoded в API Ёжки."""
+    return f"{deadline}T23:59:59+03:00"
+
+
+async def _priority_id(client: YozhkaClient, priority: str | None) -> int:
+    """Резолв названия приоритета в id; неизвестное — ошибка со списком (без молчаливых подмен)."""
+    if priority is None:
+        return 2
+    priorities = await client.list_priorities()
+    for p in priorities:
+        if p["priorityName"].lower() == priority.lower():
+            return p["id"]
+    names = ", ".join(p["priorityName"] for p in priorities)
+    raise ToolError(f"Неизвестный приоритет: {priority}. Доступны: {names}")
 
 
 def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
 
     @mcp.tool
-    async def list_tasks(project_id: int, search_text: str = "", size: int = 100) -> dict:
-        """[read-only] Задачи проекта ({content: [Task]}). Компактные поля: id, code, title, statusId…"""
-        result = await client.list_tasks(project_id, search_text=search_text, size=size)
+    async def list_tasks(project_id: int, search_text: str = "", page: int = 0,
+                         size: int = 100) -> dict:
+        """[read-only] Задачи проекта ({content: [Task]} + пагинация). Компактные поля: id, code, title, statusId…"""
+        result = await client.list_tasks(project_id, search_text=search_text,
+                                         page=page, size=size)
         result["content"] = [compact(t) for t in result.get("content", [])]
+        result["page"] = page_info(result)
         return result
 
     @mcp.tool
-    async def search_tasks(project_id: int, search_text: str, size: int = 50) -> dict:
-        """[read-only] Поиск задач проекта по тексту."""
-        result = await client.search_tasks(project_id, search_text, size=size)
+    async def search_tasks(project_id: int, search_text: str, page: int = 0,
+                           size: int = 50) -> dict:
+        """[read-only] Поиск задач проекта по тексту (+ пагинация)."""
+        result = await client.search_tasks(project_id, search_text, page=page, size=size)
         result["content"] = [compact(t) for t in result.get("content", [])]
+        result["page"] = page_info(result)
         return result
 
     @mcp.tool
@@ -38,20 +62,16 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
         title: str,
         description: str = "",
         priority: str | None = None,
-        status_id: int = 1,
+        status_id: int | None = None,
         deadline: str | None = None,
     ) -> dict:
         """[write] Создать задачу. priority: 'Низкий'|'Средний'|'Высокий'|'Критичный'.
-        deadline: 'YYYY-MM-DD' (23:59:59 местной таймзоны). status_id: 1 Новая, 2 В работе, 3 Закрыта, 4 В ожидании.
+        status_id — из list_board_columns ЭТОГО проекта (id колонок уникальны per-project);
+        по умолчанию первая колонка. deadline: 'YYYY-MM-DD' (23:59:59 по Москве).
         В description упоминания: @[email] → живой тег."""
         async def _fn():
-            priority_id = 2
-            if priority:
-                priorities = await client.list_priorities()
-                priority_id = next(
-                    (p["id"] for p in priorities if p["priorityName"].lower() == priority.lower()), 2
-                )
-            deadline_ts = f"{deadline}T23:59:59+03:00" if deadline else None
+            priority_id = await _priority_id(client, priority)
+            deadline_ts = _deadline_to_ts(deadline) if deadline else None
             body = await html_with_mentions(description, client.find_user_by_email) if description else ""
             task = await client.create_task(
                 project_id, title, description=body, priority_id=priority_id,
@@ -70,46 +90,41 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
             if description is not None:
                 task["contentData"] = await html_with_mentions(description, client.find_user_by_email)
             updated = await client.update_task(task)
-            return compact(updated)
+            result = compact(updated)
+            result["description"] = strip_html(updated.get("contentData"))
+            return result
         return await run(write_guard(read_only, _fn))
 
     @mcp.tool
     async def move_task(task_code: str, status_id: int) -> dict:
-        """[write] Переместить задачу в колонку (status_id из list_board_columns: 1..4 или кастомный)."""
+        """[write] Переместить задачу в колонку (status_id из list_board_columns: дефолт 1..4 или кастомный)."""
         async def _fn():
             task = await client.get_task(task_code)
             task["statusId"] = status_id
             updated = await client.update_task(task)
             return compact(updated)
-        return await write_guard(read_only, _fn)()
+        return await run(write_guard(read_only, _fn))
 
     @mcp.tool
     async def set_task_priority(task_code: str, priority: str) -> dict:
         """[write] Приоритет задачи: 'Низкий' | 'Средний' | 'Высокий' | 'Критичный' | 'Не задан'."""
         async def _fn():
-            priorities = await client.list_priorities()
-            priority_id = next(
-                (p["id"] for p in priorities if p["priorityName"].lower() == priority.lower()), None
-            )
-            if priority_id is None:
-                from fastmcp.exceptions import ToolError
-                raise ToolError(f"Неизвестный приоритет: {priority}. Доступны: "
-                                + ", ".join(p["priorityName"] for p in priorities))
+            priority_id = await _priority_id(client, priority)
             task = await client.get_task(task_code)
             task["priorityId"] = priority_id
             updated = await client.update_task(task)
             return compact(updated)
-        return await write_guard(read_only, _fn)()
+        return await run(write_guard(read_only, _fn))
 
     @mcp.tool
     async def set_task_deadline(task_code: str, deadline: str | None = None) -> dict:
-        """[write] Дедлайн задачи: 'YYYY-MM-DD' или null (снять)."""
+        """[write] Дедлайн задачи: 'YYYY-MM-DD' (23:59:59 по Москве) или null (снять = бессрочно)."""
         async def _fn():
             task = await client.get_task(task_code)
-            task["deadlineTs"] = f"{deadline}T23:59:59+03:00" if deadline else ep.FOREVER
+            task["deadlineTs"] = _deadline_to_ts(deadline) if deadline else ep.FOREVER
             updated = await client.update_task(task)
             return compact(updated)
-        return await write_guard(read_only, _fn)()
+        return await run(write_guard(read_only, _fn))
 
     @mcp.tool
     async def set_task_executors(task_code: str, executor_ids: list[int]) -> dict:
@@ -119,18 +134,26 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
             task["executorsIds"] = executor_ids
             updated = await client.update_task(task)
             return compact(updated)
-        return await write_guard(read_only, _fn)()
+        return await run(write_guard(read_only, _fn))
 
     @mcp.tool
     async def set_task_tags(task_code: str, tag_ids: list[int], workspace_id: int) -> dict:
-        """[write] Заменить метки задачи (id из list_tags)."""
+        """[write] Заменить метки задачи (id из list_tags). Неизвестный id — ошибка, без тихой фильтрации."""
         async def _fn():
             task = await client.get_task(task_code)
             tags_response = await client.list_tags(workspace_id)
-            task["tags"] = [t for t in tags_response.get("content", []) if t["id"] in tag_ids]
+            known = {t.get("id"): t for t in tags_response.get("content", [])}
+            unknown = [i for i in tag_ids if i not in known]
+            if unknown:
+                raise ToolError(
+                    f"Неизвестные tag_id: {unknown}. Доступны: {sorted(known)} (list_tags)"
+                )
+            task["tags"] = [known[i] for i in tag_ids]
             updated = await client.update_task(task)
-            return compact(updated)
-        return await write_guard(read_only, _fn)()
+            result = compact(updated)
+            result["tags"] = updated.get("tags", [])
+            return result
+        return await run(write_guard(read_only, _fn))
 
     @mcp.tool
     async def complete_task(task_code: str, completed: bool = True) -> dict:
@@ -140,7 +163,7 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
             task["isCompleted"] = completed
             updated = await client.update_task(task)
             return compact(updated)
-        return await write_guard(read_only, _fn)()
+        return await run(write_guard(read_only, _fn))
 
     @mcp.tool
     async def delete_task(task_code: str) -> dict:
@@ -149,13 +172,15 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
             task = await client.get_task(task_code)
             await client.delete_task(task["id"])
             return {"deleted": task_code, "id": task["id"]}
-        return await write_guard(read_only, _fn)()
+        return await run(write_guard(read_only, _fn))
 
     @mcp.tool
-    async def get_task_history(task_code: str, size: int = 20) -> dict:
-        """[read-only] История изменений задачи: кто/что/когда/старое→новое значение."""
+    async def get_task_history(task_code: str, page: int = 0, size: int = 20) -> dict:
+        """[read-only] История изменений задачи: кто/что/когда/старое→новое значение (+ пагинация)."""
         task = await client.get_task(task_code)
-        return await client.get_task_history(task["id"], size=size)
+        result = await client.get_task_history(task["id"], page=page, size=size)
+        result["page"] = page_info(result)
+        return result
 
     @mcp.tool
     async def list_priorities() -> list:

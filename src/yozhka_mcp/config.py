@@ -34,6 +34,11 @@ class Config:
         self.request_timeout: float = float(os.environ.get("YOZHKA_TIMEOUT", "30"))
         self.max_retries: int = int(os.environ.get("YOZHKA_MAX_RETRIES", "3"))
         self.debug: bool = _env_bool("YOZHKA_DEBUG", default=False)
+        # Транспорт: stdio (по умолчанию, для локальных клиентов) или http
+        # (streamable-http, для запуска как сервиса — Docker/NAS/VPS).
+        self.transport: str = os.environ.get("YOZHKA_TRANSPORT", "stdio").strip().lower()
+        self.host: str = os.environ.get("YOZHKA_HOST", "127.0.0.1")
+        self.port: int = int(os.environ.get("YOZHKA_PORT", "8000"))
 
     @property
     def has_auth(self) -> bool:

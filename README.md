@@ -54,6 +54,9 @@ uv sync
 | `YOZHKA_READ_ONLY` | `false` | `true` — write-тулы не регистрируются + guard на вызов |
 | `YOZHKA_TIMEOUT` | `30` | таймаут запроса, сек |
 | `YOZHKA_DEBUG` | `false` | debug-логи |
+| `YOZHKA_TRANSPORT` | `stdio` | `stdio` \| `http` (streamable-http, для Docker/NAS/VPS) |
+| `YOZHKA_HOST` | `127.0.0.1` | адрес в http-режиме (в Docker — `0.0.0.0`) |
+| `YOZHKA_PORT` | `8000` | порт в http-режиме |
 
 ## Подключение
 
@@ -126,6 +129,66 @@ uv sync
   }
 }
 ```
+
+## Способы запуска
+
+### 1. Локально через uv (stdio) — основной способ
+
+MCP-клиент сам стартует процесс на каждую сессию и общается по stdin/stdout. Никакого демона: вышел из клиента — процесса нет. Конфиги — в разделе «Подключение» выше.
+
+### 2. Docker (stdio)
+
+Тот же stdio, но вместо python+uv на хосте — одноразовый контейнер (флаг `-i` обязателен, `-t` нельзя — испортит протокол):
+
+```bash
+docker build -t yozhka-mcp .
+```
+
+```json
+{
+  "mcpServers": {
+    "yozhka": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "--env-file", "/Users/ТВОЙ_ЮЗЕР/yozhka-mcp/.env", "yozhka-mcp"]
+    }
+  }
+}
+```
+
+Токен передаётся в рантайме (`--env-file` / `-e YOZHKA_REFRESH_TOKEN=…`), в образ он не попадает (`.env` в `.dockerignore`).
+
+### 3. Docker как сервис (HTTP, streamable-http)
+
+Долгоживущий контейнер, клиенты подключаются по URL `http://localhost:8000/mcp`. Удобно, когда один инстанс хотят несколько клиентов/машин, а токен лежит в одном месте (NAS/VPS):
+
+```bash
+docker compose up -d --build
+```
+
+Конфиги клиентов:
+
+```json
+// ZCode / Cursor
+{ "mcpServers": { "yozhka": { "url": "http://localhost:8000/mcp" } } }
+```
+
+```json
+// OpenCode
+{ "mcp": { "yozhka": { "type": "remote", "url": "http://localhost:8000/mcp" } } }
+```
+
+> ⚠️ HTTP-эндпоинт **без авторизации** — любой, кто достучится до порта, получит полный доступ к твоей Ёжке. Поэтому compose маппит порт только на `127.0.0.1`. Для доступа снаружи — SSH-туннель или реверс-прокси с auth; для экстрима — `YOZHKA_READ_ONLY=true`.
+
+### 4. Альпин-образ
+
+Зависимости здесь pure-python + musl-wheels (pydantic-core), так что доступен и alpine:
+
+```bash
+docker build --build-arg BASE=ghcr.io/astral-sh/uv:python3.12-alpine \
+  --build-arg RUNTIME=python:3.12-alpine -t yozhka-mcp:alpine .
+```
+
+Добавишь зависимость с C-расширением без musllinux-wheel — вернись на дефолтный slim.
 
 ## Проверка
 

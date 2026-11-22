@@ -1,84 +1,99 @@
 # yozhka-mcp
 
-Неофициальный [MCP](https://modelcontextprotocol.io)-сервер для [Ёжки](https://yozhka.lukit.ru/) — бесплатного канбан-планировщика от Лукит.
+Неофициальный [MCP](https://modelcontextprotocol.io)-сервер для [Ёжки](https://yozhka.lukit.ru/) — бесплатного канбан-планировщика от Лукит. Подключается к AI-ассистенту (ZCode, Claude Desktop, Cursor, OpenCode и любому другому MCP-клиенту) и даёт ему полный доступ к вашим пространствам, проектам и задачам: создавать и двигать задачи, управлять колонками и участниками, комментировать, назначать исполнителей и дедлайны.
 
-Позволяет AI-ассистенту (Claude, Cursor, ZCode, OpenCode и др.) работать с твоими пространствами, проектами и задачами: создавать, двигать, комментировать, назначать исполнителей, управлять колонками и участниками.
+У Ёжки нет публичного API, поэтому сервер работает через внутренний REST API веб-приложения (`yozhka.lukit.ru/backend`), reverse-engineering от ноября 2026. API может измениться без предупреждения. Для личного использования; проект не связан с Лукит/Ростелеком.
 
-> ⚠️ У Ёжки нет публичного API — сервер работает через внутренний REST API веб-приложения (`yozhka.lukit.ru/backend`), реверс-инжиниринг от 2026-11-22. API может измениться без предупреждения; всё API-специфичное изолировано в `src/yozhka_mcp/api/endpoints.py`. Для личного использования.
+## Возможности
 
-## Возможности (49 тулов)
+49 инструментов, сгруппированных по доменам:
 
-- **Пространства**: список, детали, создание, переименование, участники, приглашения по email, роли, лимиты тарифа
-- **Проекты**: список (активные/избранные/архив), детали, создание, переименование, архив/восстановление, избранное, участники
-- **Канбан-колонки**: список, создание, переименование, смена цвета, удаление
-- **Задачи**: список/поиск, детали, создание, редактирование, перемещение между колонками, приоритет, дедлайн, исполнители, метки, отметка выполнения, удаление, история изменений
-- **Чек-листы**: пункты, отметки, правка (название/дата/исполнители), удаление, преобразование пункта в задачу
-- **Комментарии**: список, добавление (в т.ч. ответы), правка, удаление
-- **Упоминания**: `@[email]` в тексте комментария или описании задачи → живой тег Ёжки (палец, уведомление); плейн «@имя» остаётся текстом
-- **Пользователи**: профиль, поиск по email; **Уведомления**
-- **Пермиссии**: полномочия (`userWorkspaceAuthorities` / `userProjectAuthorities`) приходят в объектах — read/write доступ виден напрямую
+- **Пространства** — список, детали, создание, переименование, участники, приглашения по email, роли, лимиты тарифа
+- **Проекты** — список (активные / избранные / архив), детали, создание, переименование, архивация и восстановление, избранное, участники
+- **Колонки доски** — список, создание, переименование, смена цвета, удаление
+- **Задачи** — список и поиск, детали, создание, редактирование, перемещение между колонками, приоритет, дедлайн, исполнители, метки, отметка выполнения, удаление, история изменений
+- **Чек-листы** — пункты и отметки, правка пункта (название, дата, исполнители), удаление, преобразование пункта в отдельную задачу
+- **Комментарии** — список, добавление (в том числе ответы), правка, удаление
+- **Упоминания** — `@[email]` в тексте комментария или описании задачи превращается в «живой» тег Ёжки; обычный «@имя» остаётся текстом
+- **Пользователи и уведомления** — профиль, поиск по email, лента уведомлений
 
-Read/write управляется переменной `YOZHKA_READ_ONLY` (см. ниже).
+Режим только для чтения включается переменной `YOZHKA_READ_ONLY=true`: write-инструменты не регистрируются вообще, плюс внутренняя проверка в каждом вызове (двойная защита).
+
+## Требования
+
+- Python 3.11+
+- [uv](https://docs.astral.sh/uv/) (менеджер окружений; на macOS ставится через `brew install uv`)
+- Учётная запись Ёжки с доступом к веб-версии
 
 ## Установка
 
-Нужен Python 3.11+ и [uv](https://docs.astral.sh/uv/):
-
 ```bash
-git clone <repo> ~/yozhka-mcp && cd ~/yozhka-mcp
+git clone <repo> ~/yozhka-mcp
+cd ~/yozhka-mcp
 uv sync
 ```
 
-## Как достать токен
+`uv sync` создаст виртуальное окружение и поставит зависимости. Проверить, что всё собралось:
 
-Ёжка использует Keycloak SSO. MCP-серверу нужен **refresh-токен** (живёт ~30 дней):
+```bash
+uv run pytest
+```
 
-1. Открой https://yozhka.lukit.ru в браузере и войди.
-2. DevTools (F12) → Console:
+## Токен
+
+Ёжка авторизуется через Keycloak SSO. Серверу нужен refresh-токен (живёт около 30 дней), access-токен он получает и обновляет сам.
+
+1. Откройте https://yozhka.lukit.ru и войдите.
+2. Откройте DevTools (F12), вкладка Console, выполните:
    ```js
    copy(JSON.parse(localStorage.getItem('ejka.refreshToken')))
    ```
-   (токен скопируется в буфер обмена)
-3. Положи его в `~/yozhka-mcp/.env`:
+   Токен скопируется в буфер обмена.
+3. Создайте файл `.env` в корне репозитория и вставьте токен:
    ```
    YOZHKA_REFRESH_TOKEN=eyJhbGciOiJIUzUxMiIs...
    ```
-4. Через ~30 дней сессия истечёт — повтори шаги (сервер сам обновляет access-токен через `/auth/refresh`).
+4. Примерно раз в 30 дней сессия истечёт — повторите шаги.
+
+Файл `.env` добавлен в `.gitignore` и не попадает в репозиторий и Docker-образ.
 
 ## Переменные окружения
 
 | Переменная | По умолчанию | Описание |
 |---|---|---|
-| `YOZHKA_REFRESH_TOKEN` | — | refresh-токен (~30 дней), основной способ |
-| `YOZHKA_ACCESS_TOKEN` | — | готовый access-токен (~1 час), альтернатива |
-| `YOZHKA_BASE_URL` | `https://yozhka.lukit.ru/backend` | base URL API |
-| `YOZHKA_READ_ONLY` | `false` | `true` — write-тулы не регистрируются + guard на вызов |
-| `YOZHKA_TIMEOUT` | `30` | таймаут запроса, сек |
-| `YOZHKA_DEBUG` | `false` | debug-логи |
-| `YOZHKA_TRANSPORT` | `stdio` | `stdio` \| `http` (streamable-http, для Docker/NAS/VPS) |
-| `YOZHKA_HOST` | `127.0.0.1` | адрес в http-режиме (в Docker — `0.0.0.0`) |
-| `YOZHKA_PORT` | `8000` | порт в http-режиме |
+| `YOZHKA_REFRESH_TOKEN` | — | refresh-токен, основной способ авторизации |
+| `YOZHKA_ACCESS_TOKEN` | — | готовый access-токен (живёт ~1 час), альтернатива для отладки |
+| `YOZHKA_BASE_URL` | `https://yozhka.lukit.ru/backend` | адрес API |
+| `YOZHKA_READ_ONLY` | `false` | `true` — без write-инструментов |
+| `YOZHKA_TIMEOUT` | `30` | таймаут запроса, секунды |
+| `YOZHKA_MAX_RETRIES` | `3` | число повторов при 429/5xx |
+| `YOZHKA_TRANSPORT` | `stdio` | `stdio` или `http` (streamable-http, для Docker-сервиса) |
+| `YOZHKA_HOST` / `YOZHKA_PORT` | `127.0.0.1` / `8000` | адрес и порт в http-режиме |
+| `YOZHKA_DEBUG` | `false` | отладочные логи |
 
-## Подключение
+## Подключение к клиентам
+
+Во всех примерах замените путь на свой.
 
 ### ZCode
 
-В конфиг MCP-серверов ZCode:
+`~/.zcode/cli/config.json`:
 
 ```json
 {
-  "mcpServers": {
-    "yozhka": {
-      "command": "uv",
-      "args": ["run", "--directory", "/Users/ТВОЙ_ЮЗЕР/yozhka-mcp", "yozhka-mcp"],
-      "env": {
-        "YOZHKA_REFRESH_TOKEN": "eyJ...",
-        "YOZHKA_READ_ONLY": "false"
+  "mcp": {
+    "servers": {
+      "yozhka": {
+        "type": "stdio",
+        "command": "/opt/homebrew/bin/uv",
+        "args": ["run", "--directory", "/Users/USER/yozhka-mcp", "yozhka-mcp"]
       }
     }
   }
 }
 ```
+
+Путь к `uv` лучше указать абсолютный: у GUI-приложений часто нет `/opt/homebrew/bin` в `PATH`. Токен в конфиг не нужен — сервер читает `.env` из каталога проекта.
 
 ### Claude Desktop
 
@@ -89,8 +104,7 @@ uv sync
   "mcpServers": {
     "yozhka": {
       "command": "uv",
-      "args": ["run", "--directory", "/Users/ТВОЙ_ЮЗЕР/yozhka-mcp", "yozhka-mcp"],
-      "env": { "YOZHKA_REFRESH_TOKEN": "eyJ..." }
+      "args": ["run", "--directory", "/Users/USER/yozhka-mcp", "yozhka-mcp"]
     }
   }
 }
@@ -98,15 +112,14 @@ uv sync
 
 ### Cursor
 
-`.cursor/mcp.json` в проекте (или глобально `~/.cursor/mcp.json`):
+`.cursor/mcp.json` в проекте или `~/.cursor/mcp.json` глобально:
 
 ```json
 {
   "mcpServers": {
     "yozhka": {
       "command": "uv",
-      "args": ["run", "--directory", "/Users/ТВОЙ_ЮЗЕР/yozhka-mcp", "yozhka-mcp"],
-      "env": { "YOZHKA_REFRESH_TOKEN": "eyJ..." }
+      "args": ["run", "--directory", "/Users/USER/yozhka-mcp", "yozhka-mcp"]
     }
   }
 }
@@ -121,11 +134,7 @@ uv sync
   "mcp": {
     "yozhka": {
       "type": "local",
-      "command": ["uv", "run", "--directory", "/Users/ТВОЙ_ЮЗЕР/yozhka-mcp", "yozhka-mcp"],
-      "environment": {
-        "YOZHKA_REFRESH_TOKEN": "eyJ...",
-        "YOZHKA_READ_ONLY": "false"
-      }
+      "command": ["uv", "run", "--directory", "/Users/USER/yozhka-mcp", "yozhka-mcp"]
     }
   }
 }
@@ -133,93 +142,99 @@ uv sync
 
 ## Способы запуска
 
-### 1. Локально через uv (stdio) — основной способ
+### Локально через uv (stdio)
 
-MCP-клиент сам стартует процесс на каждую сессию и общается по stdin/stdout. Никакого демона: вышел из клиента — процесса нет. Конфиги — в разделе «Подключение» выше.
+Основной режим: MCP-клиент сам запускает процесс на каждую сессию и общается с ним по stdin/stdout. Демона нет, порт не занимается. Конфигурация — в разделе выше.
 
-### 2. Docker (stdio)
+### Docker (stdio)
 
-Тот же stdio, но вместо python+uv на хосте — одноразовый контейнер (флаг `-i` обязателен, `-t` нельзя — испортит протокол):
+Если не хочется держать Python и uv на хосте:
 
 ```bash
 docker build -t yozhka-mcp .
 ```
+
+Конфигурация клиента:
 
 ```json
 {
   "mcpServers": {
     "yozhka": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "--env-file", "/Users/ТВОЙ_ЮЗЕР/yozhka-mcp/.env", "yozhka-mcp"]
+      "args": ["run", "-i", "--rm", "--env-file", "/Users/USER/yozhka-mcp/.env", "yozhka-mcp"]
     }
   }
 }
 ```
 
-Токен передаётся в рантайме (`--env-file` / `-e YOZHKA_REFRESH_TOKEN=…`), в образ он не попадает (`.env` в `.dockerignore`).
+Флаг `-i` обязателен, `-t` нельзя — TTY ломает JSON-RPC. Токен передаётся в рантайме, в образ он не попадает.
 
-### 3. Docker как сервис (HTTP, streamable-http)
+### Docker как сервис (HTTP)
 
-Долгоживущий контейнер, клиенты подключаются по URL `http://localhost:8000/mcp`. Удобно, когда один инстанс хотят несколько клиентов/машин, а токен лежит в одном месте (NAS/VPS):
+Долгоживущий контейнер, клиенты подключаются по URL `http://localhost:8000/mcp`. Удобно, когда одним сервером пользуются несколько клиентов или машин:
 
 ```bash
 docker compose up -d --build
 ```
 
-Конфиги клиентов:
+Конфигурация клиентов для URL-подключения:
 
 ```json
-// ZCode / Cursor
-{ "mcpServers": { "yozhka": { "url": "http://localhost:8000/mcp" } } }
+{"mcpServers": {"yozhka": {"url": "http://localhost:8000/mcp"}}}
 ```
 
 ```json
-// OpenCode
-{ "mcp": { "yozhka": { "type": "remote", "url": "http://localhost:8000/mcp" } } }
+{"mcp": {"yozhka": {"type": "remote", "url": "http://localhost:8000/mcp"}}}
 ```
 
-> ⚠️ HTTP-эндпоинт **без авторизации** — любой, кто достучится до порта, получит полный доступ к твоей Ёжке. Поэтому compose маппит порт только на `127.0.0.1`. Для доступа снаружи — SSH-туннель или реверс-прокси с auth; для экстрима — `YOZHKA_READ_ONLY=true`.
+(первый вариант — ZCode/Cursor, второй — OpenCode)
 
-### 4. Альпин-образ
+Важно: HTTP-эндпоинт не требует авторизации — любой, кто достучится до порта, получит доступ к вашей Ёжке. Поэтому compose публикует порт только на `127.0.0.1`. Для доступа с других машин используйте SSH-туннель или обратный прокси с авторизацией; крайний случай — `YOZHKA_READ_ONLY=true`.
 
-Зависимости здесь pure-python + musl-wheels (pydantic-core), так что доступен и alpine:
+### Alpine-образ
+
+Зависимости проекта — чистый Python плюс musl-совместимые wheels, поэтому доступен и alpine (222 МБ вместо 352 у slim):
 
 ```bash
 docker build --build-arg BASE=ghcr.io/astral-sh/uv:python3.12-alpine \
   --build-arg RUNTIME=python:3.12-alpine -t yozhka-mcp:alpine .
 ```
 
-Добавишь зависимость с C-расширением без musllinux-wheel — вернись на дефолтный slim.
+Если добавите зависимость с C-расширением без musllinux-wheel — вернитесь на образ по умолчанию.
 
 ## Проверка
 
 ```bash
-# MCP Inspector
-uv run mcp dev src/yozhka_mcp/server.py
-
-# или просто тесты
+# тесты
 uv run pytest
+
+# интерактивная проверка через MCP Inspector
+uv run mcp dev src/yozhka_mcp/server.py
 ```
 
-## Структура
+## Структура проекта
 
 ```
 src/yozhka_mcp/
-  server.py             # FastMCP, регистрация тулов, READ_ONLY
-  config.py             # env-конфиг
+  server.py             # FastMCP, регистрация инструментов, READ_ONLY
+  config.py             # конфигурация из переменных окружения
   api/
-    client.py           # httpx + Bearer + авто-refresh + tenacity-ретраи
-    endpoints.py        # ВСЕ пути API (правится при drift)
-    exceptions.py       # AuthError, NotFound, PermissionDenied...
-  tools/                # тулы по доменам: workspaces, projects, columns, tasks,
-                        # checklists, comments, misc, auth
-tests/                  # respx-моки + in-memory fastmcp.Client
-research/               # результаты реверса API (endpoints.md, сырые дампы)
+    client.py           # httpx, Bearer, авто-refresh, повторы
+    endpoints.py        # все пути API в одном месте
+    exceptions.py       # AuthError, NotFoundError, PermissionDeniedError и др.
+  tools/                # инструменты по доменам: workspaces, projects, columns,
+                        # tasks, checklists, comments, misc, auth
+tests/                  # моки respx + клиент fastmcp in-memory
+research/               # результаты reverse-engineering API
 ```
+
+## Известные особенности API
+
+Всё специфичное для API собрано в `api/endpoints.py`, чтобы при изменениях править в одном месте. Основные нюансы, узнанные живыми запросами: `PUT /task` и `PUT /comment` требуют полного объекта; id колонок уникальны для каждого проекта; текстовые поля — HTML; даты без значения кодируются сентинелом `2999-12-31T00:00:00Z`.
 
 ## Отказ от ответственности
 
-Проект не связан с Лукит/Ростелеком. Использует приватное API; соблюдай пользовательское соглашение сервиса и не злоупотребляй запросами (в клиенте есть ретраи с backoff).
+Проект не связан с Лукит и Ростелеком, использует приватное API. Соблюдайте пользовательское соглашение сервиса и не злоупотребляйте количеством запросов (в клиенте есть повторы с экспоненциальной паузой).
 
 ## Лицензия
 

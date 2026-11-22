@@ -381,10 +381,6 @@ class YozhkaClient:
 
     # ---------- Мои задачи / глобальные списки ----------
 
-    async def list_assigned_tasks(self, user_id: int) -> Any:
-        """Все задачи пользователя во всех пространствах."""
-        return await self._request("GET", ep.USER_ASSIGNED_TASKS.format(user_id=user_id))
-
     async def list_deadline_tasks(self, workspace_id: int, user_id: int,
                                   with_deadline: bool = True, search: str = "") -> Any:
         """Задачи пространства с дедлайнами (ежедневник) или без них."""

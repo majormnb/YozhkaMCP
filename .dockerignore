@@ -1,0 +1,19 @@
+# Секреты и локальное — в образ не попадают никогда
+.env
+.env.*
+
+# Python/uv артефакты
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Не нужны внутри образа (README.md НЕ исключать — нужен hatchling'у при сборке)
+.git/
+.gitignore
+research/
+tests/
+Dockerfile
+docker-compose.yml
+.dockerignore

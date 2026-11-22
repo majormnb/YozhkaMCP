@@ -1,0 +1,12 @@
+services:
+  yozhka-mcp:
+    build: .
+    restart: unless-stopped
+    environment:
+      YOZHKA_TRANSPORT: http
+      YOZHKA_HOST: 0.0.0.0
+      YOZHKA_PORT: "8000"
+      YOZHKA_REFRESH_TOKEN: ${YOZHKA_REFRESH_TOKEN:?задай YOZHKA_REFRESH_TOKEN в .env или окружении}
+      # YOZHKA_HTTP_TOKEN: "длинный-случайный-секрет"   # обязателен, если порт доступен дальше localhost
+    ports:
+      - "127.0.0.1:8000:8000"

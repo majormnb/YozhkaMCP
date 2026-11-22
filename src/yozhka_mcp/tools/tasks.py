@@ -6,7 +6,7 @@ from fastmcp import FastMCP
 
 from ..api import endpoints as ep
 from ..api.client import YozhkaClient
-from ._shared import compact, strip_html, wrap_html, write_guard
+from ._shared import compact, resolve_mentions, strip_html, wrap_html, write_guard
 
 
 def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
@@ -42,7 +42,8 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
         deadline: str | None = None,
     ) -> dict:
         """[write] Создать задачу. priority: 'Низкий'|'Средний'|'Высокий'|'Критичный'.
-        deadline: 'YYYY-MM-DD' (23:59:59 местной таймзоны). status_id: 1 Новая, 2 В работе, 3 Закрыта, 4 В ожидании."""
+        deadline: 'YYYY-MM-DD' (23:59:59 местной таймзоны). status_id: 1 Новая, 2 В работе, 3 Закрыта, 4 В ожидании.
+        В description упоминания: @[email] → живой тег."""
         async def _fn():
             priority_id = 2
             if priority:
@@ -51,8 +52,9 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
                     (p["id"] for p in priorities if p["priorityName"].lower() == priority.lower()), 2
                 )
             deadline_ts = f"{deadline}T23:59:59+03:00" if deadline else None
+            body = await resolve_mentions(description, client.find_user_by_email)
             task = await client.create_task(
-                project_id, title, description=description, priority_id=priority_id,
+                project_id, title, description=body, priority_id=priority_id,
                 status_id=status_id, deadline_ts=deadline_ts,
             )
             return compact(task)
@@ -60,13 +62,14 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
 
     @mcp.tool
     async def update_task(task_code: str, title: str | None = None, description: str | None = None) -> dict:
-        """[write] Изменить название и/или описание задачи."""
+        """[write] Изменить название и/или описание задачи. В description упоминания: @[email] → живой тег."""
         async def _fn():
             task = await client.get_task(task_code)
             if title is not None:
                 task["title"] = title
             if description is not None:
-                task["contentData"] = wrap_html(description)
+                body = await resolve_mentions(description, client.find_user_by_email)
+                task["contentData"] = wrap_html(body)
             updated = await client.update_task(task)
             return compact(updated)
         return await write_guard(read_only, _fn)()

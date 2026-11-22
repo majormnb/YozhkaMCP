@@ -46,6 +46,31 @@ def wrap_html(value: str) -> str:
     return f"<p>{value}</p>"
 
 
+MENTION_RE = re.compile(r"@\[([^\]]+)\]")
+
+
+def mention_html(user: dict) -> str:
+    """Живой тег упоминания Ёжки (TipTap mention: span data-type="mention")."""
+    mail = user.get("mail") or user.get("email") or ""
+    name = user.get("displayName") or mail
+    return f'<span data-type="mention" data-id="{user.get("id")},{mail}" data-label="{name}">@{name}</span>'
+
+
+async def resolve_mentions(text: str, lookup) -> str:
+    """Заменить @[email] в тексте на живые теги упоминания.
+
+    lookup — async функция email → список пользователей (client.find_user_by_email).
+    Плейн-текст «@имя» остаётся текстом: Ёжка делает упоминание живым только span-тегом.
+    """
+    matches = {m.group(0): m.group(1).strip() for m in MENTION_RE.finditer(text)}
+    for raw, email in matches.items():
+        users = await lookup(email)
+        if not users:
+            raise ToolError(f"@[{email}]: пользователь не найден")
+        text = text.replace(raw, mention_html(users[0]))
+    return text
+
+
 def page_info(response: dict) -> dict:
     return {
         "totalElements": response.get("totalElements"),

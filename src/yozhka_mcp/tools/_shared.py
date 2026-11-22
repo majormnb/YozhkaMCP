@@ -10,8 +10,8 @@ from fastmcp.exceptions import ToolError
 from ..api import text as _text
 from ..api.exceptions import YozhkaError
 
-_TASK_FIELDS_SHORT = ("id", "code", "title", "statusId", "statusName", "priorityId",
-                      "deadlineTs", "executorsIds", "isCompleted")
+_TASK_FIELDS_SHORT = ("id", "code", "title", "projectId", "statusId", "statusName",
+                      "priorityId", "deadlineTs", "executorsIds", "isCompleted")
 
 
 def write_guard(read_only: bool, fn: Callable) -> Callable:

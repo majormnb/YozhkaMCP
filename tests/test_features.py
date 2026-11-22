@@ -20,14 +20,25 @@ def _data(result):
 
 
 @respx.mock
-async def test_list_my_tasks():
+async def test_list_my_tasks_aggregates_workspaces():
     respx.get(f"{BASE}/userProfile").respond(json=[{"id": 17160}])
-    route = respx.get(f"{BASE}/userProfile/17160/assignedTasks").respond(json=[
-        {"id": 1, "code": "A-1"}, {"id": 2, "code": "B-2"}])
+    respx.get(f"{BASE}/workspace/my").respond(json={
+        "content": [{"id": 1, "code": "AAA", "title": "Первое"},
+                    {"id": 2, "code": "BBB", "title": "Второе"}]})
+    # эндпоинты ежедневника отдают пагинированный {content: [...]}
+    respx.get(f"{BASE}/task/1/allTaskWDeadline/17160").respond(
+        json={"content": [{"id": 10, "code": "AAA-1"}], "totalElements": 1})
+    respx.get(f"{BASE}/task/1/allTasksWoDeadline/17160").respond(
+        json={"content": [{"id": 11, "code": "AAA-2"}], "totalElements": 1})
+    respx.get(f"{BASE}/task/2/allTaskWDeadline/17160").respond(
+        json={"content": [{"id": 20, "code": "BBB-1"}], "totalElements": 1})
+    respx.get(f"{BASE}/task/2/allTasksWoDeadline/17160").respond(json={"content": []})
     async with Client(server.mcp) as c:
         result = await c.call_tool("list_my_tasks", {})
-        assert len(_data(result)) == 2
-        assert route.called
+        data = _data(result)
+        assert len(data) == 3
+        codes = {(t["code"], t["workspaceCode"]) for t in data}
+        assert ("AAA-1", "AAA") in codes and ("BBB-1", "BBB") in codes
 
 
 @respx.mock

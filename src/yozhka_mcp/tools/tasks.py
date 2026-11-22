@@ -191,9 +191,20 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
 
     @mcp.tool
     async def list_my_tasks() -> list:
-        """[read-only] Все задачи, назначенные на меня, во всех пространствах."""
+        """[read-only] Все мои задачи во всех пространствах (с дедлайнами и без, агрегация «ежедневника»)."""
         me = await client.get_my_profile()
-        return await client.list_assigned_tasks(me["id"])
+        result: list = []
+        workspaces = await client.list_workspaces(size=50)
+        for ws in workspaces.get("content", []):
+            for with_deadline in (True, False):
+                tasks = await client.list_deadline_tasks(ws["id"], me["id"], with_deadline)
+                items = tasks.get("content", []) if isinstance(tasks, dict) else (tasks or [])
+                for t in items:
+                    row = compact(dict(t))
+                    row["workspaceCode"] = ws.get("code")
+                    row["workspaceTitle"] = ws.get("title")
+                    result.append(row)
+        return result
 
     @mcp.tool
     async def list_deadline_tasks(workspace_id: int, with_deadline: bool = True,
@@ -201,7 +212,9 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
         """[read-only] Мои задачи пространства: с дедлайнами (with_deadline=true, «ежедневник»)
         или без дедлайнов. search — фильтр по тексту."""
         me = await client.get_my_profile()
-        return await client.list_deadline_tasks(workspace_id, me["id"], with_deadline, search)
+        tasks = await client.list_deadline_tasks(workspace_id, me["id"], with_deadline, search)
+        items = tasks.get("content", []) if isinstance(tasks, dict) else (tasks or [])
+        return [compact(t) for t in items]
 
     # ---------- Наблюдатели / копирование / перенос / повтор ----------
 
@@ -265,9 +278,12 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
                 "daysOfWeek": {d: (d in chosen) for d in all_days},
             })
             task["repeatSetting"] = rs
-            updated = await client.update_task(task)
-            result = compact(updated)
-            result["repeatSetting"] = updated.get("repeatSetting")
+            await client.update_task(task)
+            # на бесплатном тарифе сервер может молча игнорировать поле —
+            # возвращаем ФАКТИЧЕСКОЕ состояние после перечитки
+            actual = await client.get_task(task_code)
+            result = compact(actual)
+            result["repeatSetting"] = actual.get("repeatSetting")
             return result
         return await run(write_guard(read_only, _fn))
 

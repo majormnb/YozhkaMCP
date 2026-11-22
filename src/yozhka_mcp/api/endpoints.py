@@ -54,7 +54,9 @@ TASK_PRIORITY = "/taskPriority"                            # GET
 TASK_HISTORY = "/task/{task_id}/history"                   # GET ?page=0&size=
 
 # --- Задачи: глобальные списки, копирование, перенос, экспорт ---
-USER_ASSIGNED_TASKS = "/userProfile/{user_id}/assignedTasks"        # GET (мои задачи везде)
+# Примечание: /userProfile/{id}/assignedTasks существует, но серверный ACL требует
+# пермишшн DELETE_USER (админ) — для обычных аккаунтов 403, поэтому «мои задачи»
+# агрегируем по пространствам через два списка ниже.
 TASKS_WITH_DEADLINE = "/task/{workspace_id}/allTaskWDeadline/{user_id}"       # GET ?searchText=&sort=
 TASKS_WITHOUT_DEADLINE = "/task/{workspace_id}/allTasksWoDeadline/{user_id}"  # GET ?searchText=&sort=
 TASK_COPY = "/v2/task/copy/{task_id}"                      # POST ?targetProjectId= (в другой проект)

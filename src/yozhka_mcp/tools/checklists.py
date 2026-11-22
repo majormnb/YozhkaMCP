@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastmcp import FastMCP
 
 from ..api.client import YozhkaClient
-from ._shared import compact, strip_html, write_guard
+from ._shared import compact, html_with_mentions, run, strip_html, write_guard
 
 
 def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
@@ -21,11 +21,14 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
 
     @mcp.tool
     async def add_checklist_item(task_code: str, title: str) -> dict:
-        """[write] Добавить пункт в чек-лист задачи."""
+        """[write] Добавить пункт в чек-лист задачи. Упоминания: @[email] → живой тег."""
         async def _fn():
             task = await client.get_task(task_code)
-            return await client.add_checklist_item(task["id"], title)
-        return await write_guard(read_only, _fn)()
+            html = await html_with_mentions(title, client.find_user_by_email)
+            existing = await client.list_checklist(task["id"])
+            order = max((i.get("orderNum", 0) for i in existing.get("content", [])), default=0) + 1
+            return await client.add_checklist_item(task["id"], html, order_num=order)
+        return await run(write_guard(read_only, _fn))
 
     @mcp.tool
     async def mark_checklist_item(task_code: str, item_id: int, checked: bool = True) -> dict:
@@ -50,7 +53,7 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
             task = await client.get_task(task_code)
             item = await client.get_checklist_item(task["id"], item_id)
             if title is not None:
-                item["itemTitle"] = f"<p>{title}</p>"
+                item["itemTitle"] = await html_with_mentions(title, client.find_user_by_email)
             if deadline is not None:
                 item["deadlineClTs"] = f"{deadline}T23:59:59+03:00" if deadline else None
             if executor_ids is not None:
@@ -60,7 +63,7 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
             updated = await client.get_checklist_item(task["id"], item_id)
             updated["title"] = strip_html(updated.get("itemTitle"))
             return updated
-        return await write_guard(read_only, _fn)()
+        return await run(write_guard(read_only, _fn))
 
     @mcp.tool
     async def delete_checklist_item(task_code: str, item_id: int) -> dict:
@@ -77,12 +80,16 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
         async def _fn():
             task = await client.get_task(task_code)
             item = await client.get_checklist_item(task["id"], item_id)
+            title = strip_html(item.get("itemTitle"))
+            if not title:
+                from fastmcp.exceptions import ToolError
+                raise ToolError(f"Пункт {item_id} без названия — нечего переносить в задачу")
             new_task = await client.create_task(
                 project_id=task["projectId"],
-                title=strip_html(item.get("itemTitle")),
+                title=title,
                 executors_ids=item.get("executorsIds") or [],
                 deadline_ts=item.get("deadlineClTs"),
             )
             await client.delete_checklist_item(item_id)
             return compact(new_task)
-        return await write_guard(read_only, _fn)()
+        return await run(write_guard(read_only, _fn))

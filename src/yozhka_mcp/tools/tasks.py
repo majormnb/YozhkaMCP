@@ -6,7 +6,7 @@ from fastmcp import FastMCP
 
 from ..api import endpoints as ep
 from ..api.client import YozhkaClient
-from ._shared import compact, resolve_mentions, strip_html, wrap_html, write_guard
+from ._shared import compact, html_with_mentions, run, strip_html, wrap_html, write_guard
 
 
 def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
@@ -52,13 +52,13 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
                     (p["id"] for p in priorities if p["priorityName"].lower() == priority.lower()), 2
                 )
             deadline_ts = f"{deadline}T23:59:59+03:00" if deadline else None
-            body = await resolve_mentions(description, client.find_user_by_email)
+            body = await html_with_mentions(description, client.find_user_by_email) if description else ""
             task = await client.create_task(
                 project_id, title, description=body, priority_id=priority_id,
                 status_id=status_id, deadline_ts=deadline_ts,
             )
             return compact(task)
-        return await write_guard(read_only, _fn)()
+        return await run(write_guard(read_only, _fn))
 
     @mcp.tool
     async def update_task(task_code: str, title: str | None = None, description: str | None = None) -> dict:
@@ -68,11 +68,10 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
             if title is not None:
                 task["title"] = title
             if description is not None:
-                body = await resolve_mentions(description, client.find_user_by_email)
-                task["contentData"] = wrap_html(body)
+                task["contentData"] = await html_with_mentions(description, client.find_user_by_email)
             updated = await client.update_task(task)
             return compact(updated)
-        return await write_guard(read_only, _fn)()
+        return await run(write_guard(read_only, _fn))
 
     @mcp.tool
     async def move_task(task_code: str, status_id: int) -> dict:

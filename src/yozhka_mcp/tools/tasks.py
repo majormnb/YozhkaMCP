@@ -186,3 +186,104 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
     async def list_priorities() -> list:
         """[read-only] Справочник приоритетов (id ↔ название)."""
         return await client.list_priorities()
+
+    # ---------- Глобальные списки ----------
+
+    @mcp.tool
+    async def list_my_tasks() -> list:
+        """[read-only] Все задачи, назначенные на меня, во всех пространствах."""
+        me = await client.get_my_profile()
+        return await client.list_assigned_tasks(me["id"])
+
+    @mcp.tool
+    async def list_deadline_tasks(workspace_id: int, with_deadline: bool = True,
+                                  search: str = "") -> list:
+        """[read-only] Мои задачи пространства: с дедлайнами (with_deadline=true, «ежедневник»)
+        или без дедлайнов. search — фильтр по тексту."""
+        me = await client.get_my_profile()
+        return await client.list_deadline_tasks(workspace_id, me["id"], with_deadline, search)
+
+    # ---------- Наблюдатели / копирование / перенос / повтор ----------
+
+    @mcp.tool
+    async def set_task_observers(task_code: str, user_ids: list[int]) -> dict:
+        """[write] Назначить наблюдателей задачи (id из list_project_users)."""
+        async def _fn():
+            task = await client.get_task(task_code)
+            task["observersIds"] = user_ids
+            updated = await client.update_task(task)
+            result = compact(updated)
+            result["observersIds"] = updated.get("observersIds", [])
+            return result
+        return await run(write_guard(read_only, _fn))
+
+    @mcp.tool
+    async def copy_task(task_code: str, target_project_id: int) -> dict:
+        """[write] Копировать задачу в другой проект; возвращает новую задачу."""
+        async def _fn():
+            task = await client.get_task(task_code)
+            new_task = await client.copy_task(task["id"], target_project_id)
+            return compact(new_task)
+        return await run(write_guard(read_only, _fn))
+
+    @mcp.tool
+    async def move_task_to_project(task_code: str, project_id: int) -> dict:
+        """[write] Перенести задачу в другой проект (не путать с move_task — та меняет колонку)."""
+        async def _fn():
+            task = await client.get_task(task_code)
+            updated = await client.move_task_to_project(task["id"], project_id)
+            return compact(updated)
+        return await run(write_guard(read_only, _fn))
+
+    @mcp.tool
+    async def set_task_repeat(
+        task_code: str,
+        enabled: bool,
+        period: str = "WEEKLY",
+        task_repeat_type: str = "COPY",
+        days_of_week: list[str] | None = None,
+        workdays_only: bool = False,
+    ) -> dict:
+        """[write] Повторяющаяся задача (PRO-тариф Ёжки). enabled=false — выключить.
+        period: 'DAILY'|'WEEKLY'|'MONTHLY'|'ANNUALLY'; task_repeat_type: 'COPY' (новая копия)
+        | 'MOVE' (при завершении пересоздаётся сама); days_of_week для WEEKLY:
+        ['monday','tuesday',…]. Без PRO сервер вернёт ошибку — она придёт как есть."""
+        async def _fn():
+            period_u = period.upper()
+            if period_u not in {"DAILY", "WEEKLY", "MONTHLY", "ANNUALLY"}:
+                raise ToolError("period должен быть DAILY|WEEKLY|MONTHLY|ANNUALLY, получено: " + period)
+            all_days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+            chosen = set(days_of_week or ["monday"])
+            unknown_days = chosen - set(all_days)
+            if unknown_days:
+                raise ToolError(f"Неизвестные дни: {sorted(unknown_days)}. Доступны: {all_days}")
+            task = await client.get_task(task_code)
+            rs = task.get("repeatSetting") or {}
+            rs.update({
+                "enabled": enabled, "period": period_u,
+                "type": task_repeat_type.upper(), "workdaysOnly": workdays_only,
+                "daysOfWeek": {d: (d in chosen) for d in all_days},
+            })
+            task["repeatSetting"] = rs
+            updated = await client.update_task(task)
+            result = compact(updated)
+            result["repeatSetting"] = updated.get("repeatSetting")
+            return result
+        return await run(write_guard(read_only, _fn))
+
+    # ---------- Экспорт ----------
+
+    @mcp.tool
+    async def export_tasks(workspace_id: int, project_id: int, fmt: str = "xlsx",
+                           save_dir: str | None = None) -> dict:
+        """[read-only] Выгрузить задачи проекта в файл (fmt: 'xlsx'|'csv'); вернуть {path, size}."""
+        if fmt not in ("xlsx", "csv"):
+            raise ToolError("fmt должен быть xlsx или csv, получено: " + fmt)
+        import tempfile
+        from pathlib import Path
+        data = await client.export_tasks(fmt, workspace_id, project_id, f"tasks-{project_id}.{fmt}")
+        directory = Path(save_dir) if save_dir else Path(tempfile.gettempdir())
+        directory.mkdir(parents=True, exist_ok=True)
+        path = directory / f"yozhka-tasks-{project_id}.{fmt}"
+        path.write_bytes(data)
+        return {"path": str(path), "size": len(data)}

@@ -98,6 +98,7 @@ class YozhkaClient:
         files: dict[str, Any] | None = None,
         _is_refresh: bool = False,
         _auth_retried: bool = False,
+        _raw: bool = False,
     ) -> Any:
         self._ensure_open()  # клиент мог закрыть завершившийся lifespan — до любых запросов
         if not self._access_token and not _is_refresh:
@@ -115,7 +116,8 @@ class YozhkaClient:
             method,
             path,
             params=params,
-            content=data,
+            content=None if files else data,   # с files= поле data уходит как form-field
+            data=data if files else None,
             json=json_body,
             headers=req_headers,
             files=files,
@@ -133,6 +135,8 @@ class YozhkaClient:
         if response.status_code >= 400:
             self._raise_from_response(response)
 
+        if _raw:  # blob (экспорт xlsx/csv, скачивание вложений)
+            return response.content
         if response.status_code == 204 or not response.content:
             return None
         content_type = response.headers.get("content-type", "")
@@ -375,6 +379,37 @@ class YozhkaClient:
     async def list_priorities(self) -> list:
         return await self._request("GET", ep.TASK_PRIORITY)
 
+    # ---------- Мои задачи / глобальные списки ----------
+
+    async def list_assigned_tasks(self, user_id: int) -> Any:
+        """Все задачи пользователя во всех пространствах."""
+        return await self._request("GET", ep.USER_ASSIGNED_TASKS.format(user_id=user_id))
+
+    async def list_deadline_tasks(self, workspace_id: int, user_id: int,
+                                  with_deadline: bool = True, search: str = "") -> Any:
+        """Задачи пространства с дедлайнами (ежедневник) или без них."""
+        path = (ep.TASKS_WITH_DEADLINE if with_deadline else ep.TASKS_WITHOUT_DEADLINE).format(
+            workspace_id=workspace_id, user_id=user_id)
+        return await self._request("GET", path, params={"searchText": search, "sort": ""})
+
+    # ---------- Копирование / перенос / экспорт ----------
+
+    async def copy_task(self, task_id: int, target_project_id: int) -> dict:
+        return await self._request("POST", ep.TASK_COPY.format(task_id=task_id),
+                                   params={"targetProjectId": target_project_id})
+
+    async def move_task_to_project(self, task_id: int, project_id: int) -> dict:
+        return await self._request("PUT", ep.TASK_MOVE_PROJECT.format(task_id=task_id),
+                                   params={"projectId": project_id})
+
+    async def export_tasks(self, fmt: str, workspace_id: int, project_id: int,
+                           file_name: str) -> bytes:
+        """Выгрузка задач проекта в xlsx/csv; возвращает blob."""
+        return await self._request("POST", ep.TASK_EXPORT.format(fmt=fmt),
+                                   params={"workspaceId": workspace_id,
+                                           "projectId": project_id, "fileName": file_name},
+                                   _raw=True)
+
     async def get_task_history(self, task_id: int, page: int = 0, size: int = 20) -> dict:
         return await self._request("GET", ep.TASK_HISTORY.format(task_id=task_id),
                                    params={"page": page, "size": size, "search": "", "filter": "{}"})
@@ -452,6 +487,37 @@ class YozhkaClient:
 
     async def list_notifications(self, page: int = 1, size: int = 20) -> dict:
         return await self._request("GET", ep.NOTIFICATIONS, params={"page": page, "size": size, "search": ""})
+
+    async def ack_notifications(self) -> Any:
+        """Отметить все уведомления прочитанными."""
+        return await self._request("POST", ep.NOTIFICATIONS_ACK)
+
+    # ---------- Вложения ----------
+
+    async def list_attachments(self, task_id: int) -> Any:
+        return await self._request("GET", ep.ATTACHMENT_LIST, params={"taskId": task_id})
+
+    async def upload_attachment(self, entity: str, entity_id: int, file_path: str) -> Any:
+        """Приложить файл (multipart). entity: 'task' (пока только задачи)."""
+        import mimetypes
+        from pathlib import Path
+        path = Path(file_path)
+        mime = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+        with path.open("rb") as fh:
+            return await self._request(
+                "POST", ep.ATTACHER_CREATE.format(entity=entity),
+                params={"id": entity_id},
+                data={"id": str(entity_id)},
+                files={"file": (path.name, fh, mime)},
+            )
+
+    async def download_attachment(self, entity: str, entity_id: int, file_name: str) -> bytes:
+        return await self._request("POST", ep.ATTACHER_DOWNLOAD.format(entity=entity),
+                                   json_body={"fileName": file_name, "id": entity_id},
+                                   _raw=True)
+
+    async def delete_attachment(self, attachment_id: int) -> Any:
+        return await self._request("DELETE", ep.ATTACHER_ITEM.format(attachment_id=attachment_id))
 
     # ---------- утилиты ----------
 

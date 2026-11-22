@@ -53,6 +53,23 @@ TASK_BY_ID = "/task/{task_id}"                             # DELETE
 TASK_PRIORITY = "/taskPriority"                            # GET
 TASK_HISTORY = "/task/{task_id}/history"                   # GET ?page=0&size=
 
+# --- Задачи: глобальные списки, копирование, перенос, экспорт ---
+USER_ASSIGNED_TASKS = "/userProfile/{user_id}/assignedTasks"        # GET (мои задачи везде)
+TASKS_WITH_DEADLINE = "/task/{workspace_id}/allTaskWDeadline/{user_id}"       # GET ?searchText=&sort=
+TASKS_WITHOUT_DEADLINE = "/task/{workspace_id}/allTasksWoDeadline/{user_id}"  # GET ?searchText=&sort=
+TASK_COPY = "/v2/task/copy/{task_id}"                      # POST ?targetProjectId= (в другой проект)
+TASK_MOVE_PROJECT = "/v2/task/move/{task_id}"              # PUT ?projectId= (перенос между проектами)
+TASK_EXPORT = "/task/export/{fmt}"                         # POST ?workspaceId=&projectId=&fileName= (xlsx|csv) -> blob
+
+# --- Уведомления ---
+NOTIFICATIONS_ACK = "/notifications/ack"                   # POST (отметить прочитанными)
+
+# --- Вложения (attacher) ---
+ATTACHMENT_LIST = "/getAttachment/list"                    # GET ?taskId=
+ATTACHER_CREATE = "/attacher/{entity}/create"              # POST multipart {id: entityId, file}
+ATTACHER_DOWNLOAD = "/attacher/{entity}/download"          # POST {fileName, id} -> blob
+ATTACHER_ITEM = "/attacher/{attachment_id}"                # DELETE
+
 # --- Чек-листы ---
 CHECKLIST_LIST = "/checklist/{task_id}/list"               # GET ?page=0&size=&searchText=
 CHECKLIST = "/checklist"                                   # POST создать пункт, PUT полный объект пункта

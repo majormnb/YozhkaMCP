@@ -190,14 +190,47 @@ async def test_update_description_with_confirm_executes():
 
 
 @respx.mock
-async def test_update_title_only_no_confirmation():
-    """Переименование — без гейта (пользователь просил гейтить только описание)."""
+async def test_update_title_of_own_task_no_gate():
+    """Переименование СВОЕЙ задачи — без гейта."""
+    respx.get(f"{BASE}/userProfile").respond(json=[{"id": 7, "displayName": "Я"}])
     respx.get(f"{BASE}/task/code/X-1").respond(json={
-        "id": 1, "code": "X-1", "title": "T", "statusId": 2, "projectId": 5})
+        "id": 1, "code": "X-1", "title": "T", "statusId": 2, "projectId": 5, "creatorId": 7})
     put_route = respx.put(f"{BASE}/task").respond(json={"id": 1, "code": "X-1", "title": "Новый"})
     async with Client(server.mcp) as c:
         r = await c.call_tool("update_task", {"task_code": "X-1", "title": "Новый"})
         assert _data(r)["title"] == "Новый"
+        assert put_route.called
+
+
+@respx.mock
+async def test_update_title_of_foreign_task_requires_confirmation():
+    """Переименование ЧУЖОЙ задачи — гейт, как и описание."""
+    respx.get(f"{BASE}/userProfile").respond(json=[{"id": 7, "displayName": "Я"}])
+    respx.get(f"{BASE}/task/code/X-1").respond(json={
+        "id": 1, "code": "X-1", "title": "T", "statusId": 2, "projectId": 5, "creatorId": 999})
+    put_route = respx.put(f"{BASE}/task").respond(json={"id": 1})
+    async with Client(server.mcp) as c:
+        r = await c.call_tool("update_task", {"task_code": "X-1", "title": "Новый"})
+        data = _data(r)
+        assert data["confirmation_required"] is True
+        assert "title" in data["action"]
+        assert not put_route.called
+
+
+@respx.mock
+async def test_update_title_and_description_foreign_one_confirm_covers_both():
+    """Один confirm=true подтверждает сразу title и description чужой задачи."""
+    respx.get(f"{BASE}/userProfile").respond(json=[{"id": 7, "displayName": "Я"}])
+    respx.get(f"{BASE}/task/code/X-1").respond(json={
+        "id": 1, "code": "X-1", "title": "T", "statusId": 2, "projectId": 5,
+        "creatorId": 999, "contentData": "<p>старое</p>"})
+    put_route = respx.put(f"{BASE}/task").respond(json={
+        "id": 1, "code": "X-1", "title": "Новый", "contentData": "<p>новое</p>"})
+    async with Client(server.mcp) as c:
+        r = await c.call_tool("update_task", {
+            "task_code": "X-1", "title": "Новый", "description": "новое", "confirm": True})
+        data = _data(r)
+        assert data["title"] == "Новый" and data["description"] == "новое"
         assert put_route.called
 
 

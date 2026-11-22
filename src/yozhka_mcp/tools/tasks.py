@@ -84,21 +84,22 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
     async def update_task(task_code: str, title: str | None = None,
                           description: str | None = None, confirm: bool = False) -> dict:
         """[write] Изменить название и/или описание задачи. В description: @[email] → живой тег, [текст](https://…) → живая ссылка.
-        Гейт подтверждения: если автор задачи — ДРУГОЙ пользователь, изменение description без confirm=True
-        вернёт confirmation_required и НИЧЕГО не изменит (задай вопрос, повтори с confirm=True после явного «да»).
-        В СВОИХ задачах (автор — текущий пользователь) описание меняется без подтверждения; переименование (title) — всегда без."""
+        Гейт подтверждения: в задаче, созданной ДРУГИМ пользователем, изменение title и/или description
+        без confirm=True вернёт confirmation_required и НИЧЕГО не изменит (задай вопрос, повтори с
+        confirm=True после явного «да»). В СВОИХ задачах (автор — текущий пользователь) — без подтверждения."""
         async def _fn():
             task = await client.get_task(task_code)
-            if description is not None and not confirm:
+            changes = [k for k, v in (("title", title), ("description", description)) if v is not None]
+            if changes and not confirm:
                 me = await client.get_my_profile()
                 if task.get("creatorId") != me["id"]:
                     return {
                         "confirmation_required": True,
                         "task": task_code,
-                        "action": "update_description",
+                        "action": "update_" + "_and_".join(changes),
                         "message": (f"Задача {task_code} создана другим пользователем. Вы уверены, "
-                                    "что хотите изменить её описание? Повтори вызов с confirm=true "
-                                    "только после явного подтверждения пользователя."),
+                                    f"что хотите изменить {' и '.join(changes)}? Повтори вызов с "
+                                    "confirm=true только после явного подтверждения пользователя."),
                     }
             if title is not None:
                 task["title"] = title

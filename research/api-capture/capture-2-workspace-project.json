@@ -1,0 +1,149 @@
+[
+  {
+    "kind": "xhr",
+    "method": "GET",
+    "reqBody": null,
+    "reqHeaders": {
+      "Accept": "application/json, text/plain, */*",
+      "Authorization": "Bearer ...MASKED"
+    },
+    "respBody": "[{\"id\":17160,\"mail\":\"begattsu@gmail.com\",\"displayName\":\"Гендос\",\"department\":null,\"company\":null,\"employeePosition\":null,\"roleId\":1,\"projDefRoleId\":null,\"chiefUserId\":null,\"employeeNumber\":null,\"officeLocation\":null,\"officePhone\":null,\"chiefMail\":null,\"chiefDisplayName\":null,\"iconUrl\":null,\"attachments\":[],\"personalPhone\":null,\"absenceBegin\":null,\"absenceEnd\":null,\"absenceType\":null,\"aboutMe\":null,\"birthdayDay\":null,\"birthdayMonth\":null,\"town\":null,\"hideBirthday\":false,\"isBlocked\":false,\"blockDate\":\"2999-12-31T00:00:00Z\",\"roles\":[{\"roleId\":13,\"roleType\":2,\"roleName\":\"Владелец проекта\",\"roleNameM\":\"role.project_owner\"}],\"isExternalUser\":true,\"firstName\":null,\"lastName\":null,\"middleName\":null,\"preferredCommunication\":null,\"isDeleted\":false,\"closeTs\":null,\"iconId\":null,\"telegramName\":null,\"projects\":[25072],\"isActive\":true,\"isNewUser\":false}]",
+    "status": 200,
+    "url": "https://yozhka.lukit.ru/backend/project/25072/activeUsers"
+  },
+  {
+    "kind": "xhr",
+    "method": "GET",
+    "reqBody": null,
+    "reqHeaders": {
+      "Accept": "application/json, text/plain, */*",
+      "Authorization": "Bearer ...MASKED"
+    },
+    "respBody": "{\"id\":18122,\"title\":\"MCP Test\",\"code\":\"BMCPTESTX\",\"description\":\"Пространство для тестирования MCP сервера\",\"companyId\":null,\"creatorId\":17160,\"creatorFullName\":\"Гендос\",\"creatorIconUrl\":null,\"createTs\":\"2026-11-21T23:56:41.115211Z\",\"closeTs\":\"2999-12-31T00:00:00Z\",\"iconColor\":\"\",\"iconUrl\":null,\"userWorkspaceAuthorities\":[\"workspace.read\",\"workspace.update\",\"workspace.delete\",\"workspace.subscription.read\",\"workspace.subscription.update\",\"workspace.invoice.read\",\"workspace.invoice.create\",\"workspace.payway.read\",\"workspace.payway.create\",\"workspace.payway.delete\",\"workspace.team_role.read\",\"workspace.team_role.create\",\"workspace.team_role.delete\",\"workspace.team_role.update\",\"workspace.team_role.set_owner\",\"workspace.project.read\",\"workspace.project.create\",\"workspace.project.update\",\"workspace.project.delete\",\"workspace.project.update_state\",\"workspace.tag.read\",\"workspace.tag.create\",\"workspace.tag.delete\"],\"subscription\":{\"id\":17937,\"endTs\":\"2999-12-31T00:00:00Z\",\"isTrialPeriod\":false,\"workspaceId\":18122,\"subscriptionType\":{\"id\":1,\"subscriptionTypeName\":\"Базовый\",\"subscriptionTypeNameM\":\"workspace.type.base\",\"subscriptionTypeFeatureSettings\":[\"project.view.board\"],\"subscriptionFunctionality\":[{\"displayName\":\"Размер команды\",\"nameM\":\"workspace_team_max\",\"limitKey\":null,\"iconType\":\"20_users_users-fill\",\"isMobile\":false,\"isWeb\":false,\"textValue\":\"до 5 участников\"},{\"displayName\":\"Объём вложений\",\"nameM\":\"workspace_attachments_max\",\"limitKey\":null,\"iconType\":\"20_technology_datastore-fill\",\"isMobile\":false,\"isWeb\":false,\"textValue\":\"1 Гб\"},{\"displayName\":\"Количество проектов\",\"nameM\":\"workspace_projects_max\",\"limitKey\":null,\"iconType\":\"20_document_folder-open-fill\",\"isMobile\":false,\"isWeb\":false,\"textValue\":\"до 10\"},{\"displayName\":\"Размер одного вложения\",\"nameM\":\"workspace_attachment_size_max\",\"limitKey\":null,\"iconType\":\"20_action_attachment\",\"isMobile\":false,\"isWeb\":false,\"textValue\":\"до 50 МБ\"}],\"pricePerMember\":0},\"subscriptionSettings\":{\"workspaceTeamMax\":\"5\",\"workspaceAttachmentsMax\":\"1073741824\",\"workspaceProjectsMax\":\"10\",\"workspaceAttacheSize\":\"52428800\"},\"autopayRule\":null},\"userWorkspaceRole\":\"role.workspace_owner\"}",
+    "status": 200,
+    "url": "https://yozhka.lukit.ru/backend/workspace/BMCPTESTX"
+  },
+  {
+    "kind": "xhr",
+    "method": "GET",
+    "reqBody": null,
+    "reqHeaders": {
+      "Accept": "application/json, text/plain, */*",
+      "Authorization": "Bearer ...MASKED"
+    },
+    "respBody": "{\"id\":25072,\"title\":\"Reverse Engineering\",\"code\":\"REVENG\",\"createTs\":\"2026-11-21T23:56:59.028988Z\",\"closeTs\":\"2999-12-31T00:00:00Z\",\"projectStatusId\":1,\"projectStateId\":1,\"ownerId\":17160,\"ownerFullName\":\"Гендос\",\"iconUrl\":null,\"iconColor\":\"\",\"attachments\":null,\"userProjectRoles\":[\"role.project_owner\"],\"userProjectAuthorities\":[\"authority_ref.project.add_participant\",\"authority_ref.project.archive\",\"authority_ref.project.edit\",\"authority_ref.project.info\",\"authority_ref.project.read\",\"authority_ref.task.create\",\"authority_ref.task.delete\",\"authority_ref.task.move\",\"authority_ref.task_status.create\",\"authority_ref.task_status.delete\",\"authority_ref.task_status.update\"],\"isFavorite\":false,\"description\":null,\"updateTs\":\"2026-11-22T00:05:49.487119Z\",\"workspaceId\":18122,\"iconName\":null,\"isBlocked\":false}",
+    "status": 200,
+    "url": "https://yozhka.lukit.ru/backend/project/code/REVENG/18122"
+  },
+  {
+    "kind": "xhr",
+    "method": "PUT",
+    "reqBody": "{\"id\":25072,\"title\":\"Reverse Engineering v2\",\"code\":\"REVENG\",\"createTs\":\"2026-11-21T23:56:59.028988Z\",\"closeTs\":\"2999-12-31T00:00:00Z\",\"projectStatusId\":1,\"projectStateId\":1,\"ownerId\":17160,\"ownerFullName\":\"Гендос\",\"iconUrl\":\"\",\"iconColor\":\"\",\"isFavorite\":false,\"description\":\"\",\"updateTs\":\"2026-11-22T00:05:49.487119Z\",\"workspaceId\":18122,\"iconName\":\"\",\"isBlocked\":false}",
+    "reqHeaders": {
+      "Accept": "application/json, text/plain, */*",
+      "Authorization": "Bearer ...MASKED",
+      "Content-Type": "application/json"
+    },
+    "respBody": "{\"id\":25072,\"title\":\"Reverse Engineering v2\",\"code\":\"REVENG\",\"createTs\":\"2026-11-21T23:56:59.028988Z\",\"closeTs\":\"2999-12-31T00:00:00Z\",\"projectStatusId\":1,\"projectStateId\":1,\"ownerId\":17160,\"ownerFullName\":\"Гендос\",\"iconUrl\":null,\"iconColor\":\"\",\"attachments\":null,\"userProjectRoles\":[\"role.project_owner\"],\"userProjectAuthorities\":[\"authority_ref.project.add_participant\",\"authority_ref.project.archive\",\"authority_ref.project.edit\",\"authority_ref.project.info\",\"authority_ref.project.read\",\"authority_ref.task.create\",\"authority_ref.task.delete\",\"authority_ref.task.move\",\"authority_ref.task_status.create\",\"authority_ref.task_status.delete\",\"authority_ref.task_status.update\"],\"isFavorite\":false,\"description\":\"\",\"updateTs\":\"2026-11-22T00:06:38.137096Z\",\"workspaceId\":18122,\"iconName\":null,\"isBlocked\":false}",
+    "status": 200,
+    "url": "https://yozhka.lukit.ru/backend/project"
+  },
+  {
+    "kind": "xhr",
+    "method": "PUT",
+    "reqBody": "{\"id\":25072,\"title\":\"Reverse Engineering\",\"code\":\"REVENG\",\"createTs\":\"2026-11-21T23:56:59.028988Z\",\"closeTs\":\"2999-12-31T00:00:00Z\",\"projectStatusId\":1,\"projectStateId\":1,\"ownerId\":17160,\"ownerFullName\":\"Гендос\",\"iconUrl\":\"\",\"iconColor\":\"\",\"isFavorite\":false,\"description\":\"Проект для реверса API\",\"updateTs\":\"2026-11-22T00:05:49.487119Z\",\"workspaceId\":18122,\"iconName\":\"\",\"isBlocked\":false}",
+    "reqHeaders": {
+      "Accept": "application/json, text/plain, */*",
+      "Authorization": "Bearer ...MASKED",
+      "Content-Type": "application/json"
+    },
+    "respBody": "{\"id\":25072,\"title\":\"Reverse Engineering\",\"code\":\"REVENG\",\"createTs\":\"2026-11-21T23:56:59.028988Z\",\"closeTs\":\"2999-12-31T00:00:00Z\",\"projectStatusId\":1,\"projectStateId\":1,\"ownerId\":17160,\"ownerFullName\":\"Гендос\",\"iconUrl\":null,\"iconColor\":\"\",\"attachments\":null,\"userProjectRoles\":[\"role.project_owner\"],\"userProjectAuthorities\":[\"authority_ref.project.add_participant\",\"authority_ref.project.archive\",\"authority_ref.project.edit\",\"authority_ref.project.info\",\"authority_ref.project.read\",\"authority_ref.task.create\",\"authority_ref.task.delete\",\"authority_ref.task.move\",\"authority_ref.task_status.create\",\"authority_ref.task_status.delete\",\"authority_ref.task_status.update\"],\"isFavorite\":false,\"description\":\"Проект для реверса API\",\"updateTs\":\"2026-11-22T00:06:38.22061Z\",\"workspaceId\":18122,\"iconName\":null,\"isBlocked\":false}",
+    "status": 200,
+    "url": "https://yozhka.lukit.ru/backend/project"
+  },
+  {
+    "kind": "xhr",
+    "method": "GET",
+    "reqBody": null,
+    "reqHeaders": {
+      "Accept": "application/json, text/plain, */*",
+      "Authorization": "Bearer ...MASKED"
+    },
+    "respBody": "{\"id\":25072,\"title\":\"Reverse Engineering\",\"code\":\"REVENG\",\"createTs\":\"2026-11-21T23:56:59.028988Z\",\"closeTs\":\"2999-12-31T00:00:00Z\",\"projectStatusId\":1,\"projectStateId\":1,\"ownerId\":17160,\"ownerFullName\":\"Гендос\",\"iconUrl\":null,\"iconColor\":\"\",\"attachments\":null,\"userProjectRoles\":[\"role.project_owner\"],\"userProjectAuthorities\":[\"authority_ref.project.add_participant\",\"authority_ref.project.archive\",\"authority_ref.project.edit\",\"authority_ref.project.info\",\"authority_ref.project.read\",\"authority_ref.task.create\",\"authority_ref.task.delete\",\"authority_ref.task.move\",\"authority_ref.task_status.create\",\"authority_ref.task_status.delete\",\"authority_ref.task_status.update\"],\"isFavorite\":false,\"description\":\"Проект для реверса API\",\"updateTs\":\"2026-11-22T00:06:38.22061Z\",\"workspaceId\":18122,\"iconName\":null,\"isBlocked\":false}",
+    "status": 200,
+    "url": "https://yozhka.lukit.ru/backend/project/25072/18122"
+  },
+  {
+    "kind": "xhr",
+    "method": "GET",
+    "reqBody": null,
+    "reqHeaders": {
+      "Accept": "application/json, text/plain, */*",
+      "Authorization": "Bearer ...MASKED"
+    },
+    "respBody": "{\"id\":25072,\"title\":\"Reverse Engineering\",\"code\":\"REVENG\",\"createTs\":\"2026-11-21T23:56:59.028988Z\",\"closeTs\":\"2999-12-31T00:00:00Z\",\"projectStatusId\":1,\"projectStateId\":1,\"ownerId\":17160,\"ownerFullName\":\"Гендос\",\"iconUrl\":null,\"iconColor\":\"\",\"attachments\":null,\"userProjectRoles\":[\"role.project_owner\"],\"userProjectAuthorities\":[\"authority_ref.project.add_participant\",\"authority_ref.project.archive\",\"authority_ref.project.edit\",\"authority_ref.project.info\",\"authority_ref.project.read\",\"authority_ref.task.create\",\"authority_ref.task.delete\",\"authority_ref.task.move\",\"authority_ref.task_status.create\",\"authority_ref.task_status.delete\",\"authority_ref.task_status.update\"],\"isFavorite\":false,\"description\":\"Проект для реверса API\",\"updateTs\":\"2026-11-22T00:06:38.22061Z\",\"workspaceId\":18122,\"iconName\":null,\"isBlocked\":false}",
+    "status": 200,
+    "url": "https://yozhka.lukit.ru/backend/project/code/REVENG/18122"
+  },
+  {
+    "kind": "xhr",
+    "method": "GET",
+    "reqBody": null,
+    "reqHeaders": {
+      "Accept": "application/json, text/plain, */*",
+      "Authorization": "Bearer ...MASKED"
+    },
+    "respBody": "{\"content\":[{\"id\":25072,\"iconUrl\":null,\"iconColor\":null,\"title\":\"Reverse Engineering\",\"code\":\"REVENG\",\"isFavorite\":false,\"workspaceId\":18122}],\"totalPages\":1,\"pageNumber\":1,\"elementsOnPage\":1,\"totalElements\":1}",
+    "status": 200,
+    "url": "https://yozhka.lukit.ru/backend/project/titles/my?page=1&size=24&workspaceCode=BMCPTESTX&workspaceId=18122&currentProjectId=25072&blocked=true"
+  },
+  {
+    "kind": "xhr",
+    "method": "PUT",
+    "reqBody": "{\"projectId\":25072,\"taskStatusId\":1,\"statusName\":\"Бэклог\",\"statusColor\":\"#5A688D\"}",
+    "reqHeaders": {
+      "Accept": "application/json, text/plain, */*",
+      "Authorization": "Bearer ...MASKED",
+      "Content-Type": "application/json"
+    },
+    "respBody": "{\"id\":113214,\"workflowId\":25137,\"orderNum\":1,\"taskStatusId\":1027,\"statusColor\":\"#5A688D\"}",
+    "status": 200,
+    "url": "https://yozhka.lukit.ru/backend/workflowStatusesAvail"
+  },
+  {
+    "kind": "xhr",
+    "method": "GET",
+    "reqBody": null,
+    "reqHeaders": {
+      "Accept": "application/json, text/plain, */*",
+      "Authorization": "Bearer ...MASKED"
+    },
+    "respBody": "[{\"id\":1027,\"name\":\"Бэклог\",\"nameM\":\"project.task.beklog\",\"closeTs\":\"2999-12-31T00:00:00Z\",\"orderNum\":1,\"statusColor\":\"#5A688D\"},{\"id\":2,\"name\":\"В работе\",\"nameM\":\"project.task.inprogress\",\"closeTs\":\"2999-12-31T00:00:00Z\",\"orderNum\":2,\"statusColor\":\"#9466FF\"},{\"id\":3,\"name\":\"Закрыта\",\"nameM\":\"project.task.closed\",\"closeTs\":\"2999-12-31T00:00:00Z\",\"orderNum\":3,\"statusColor\":\"#81cfaa\"},{\"id\":4,\"name\":\"В ожидании\",\"nameM\":\"project.task.v_ozhidanii\",\"closeTs\":\"2999-12-31T00:00:00Z\",\"orderNum\":4,\"statusColor\":\"#FFB608\"}]",
+    "status": 200,
+    "url": "https://yozhka.lukit.ru/backend/workflowStatusesAvail?projectId=25072"
+  },
+  {
+    "kind": "xhr",
+    "method": "GET",
+    "reqBody": null,
+    "reqHeaders": {
+      "Accept": "application/json, text/plain, */*",
+      "Authorization": "Bearer ...MASKED"
+    },
+    "respBody": "{\"content\":[{\"id\":215578,\"title\":\"Разведать API Ёжки\",\"projectId\":25072,\"creatorId\":17160,\"statusId\":2,\"typeId\":2,\"createTs\":\"2026-11-21T23:57:34.735772Z\",\"updateTs\":\"2026-11-22T00:01:19.036271Z\",\"code\":\"BMCPTESTX-1\",\"closeTs\":\"2999-12-31T00:00:00Z\",\"parentId\":null,\"priorityId\":3,\"hierarchyLevelId\":2,\"orderNum\":224137000,\"executorsIds\":[],\"observersIds\":[],\"contentData\":\"<p>Описание добавлено через MCP reverse session. Проверяем contentData.</p>\",\"contentDataWithTags\":null,\"deadlineTs\":\"2999-12-31T00:00:00Z\",\"deadlineMarked\":false,\"taskNum\":1,\"attachments\":[],\"backgroundUrl\":null,\"notifications\":[],\"deadlineClTs\":\"2999-12-31T00:00:00Z\",\"tags\":[],\"checkLists\":[],\"projectCode\":null,\"projectTitle\":null,\"projectIconColor\":null,\"projectIconUrl\":null,\"statusColor\":null,\"statusName\":null,\"deadlineLastClTs\":null,\"entityType\":\"task\",\"totalItemsCheckLists\":null,\"orderNumProjects\":214153000,\"isCompleted\":false,\"completeTs\":\"2999-12-31T00:00:00Z\",\"workspaceCode\":\"REVENG\",\"repeatSetting\":null}],\"totalPages\":1,\"pageNumber\":0,\"elementsOnPage\":9999,\"totalElements\":1}",
+    "status": 200,
+    "url": "https://yozhka.lukit.ru/backend/task/25072/list?page=0&size=9999&searchText="
+  },
+  {
+    "kind": "xhr",
+    "method": "GET",
+    "reqBody": null,
+    "reqHeaders": {
+      "Accept": "application/json, text/plain, */*",
+      "Authorization": "Bearer ...MASKED"
+    },
+    "respBody": "[{\"id\":17160,\"mail\":\"begattsu@gmail.com\",\"displayName\":\"Гендос\",\"department\":null,\"company\":null,\"employeePosition\":null,\"roleId\":1,\"projDefRoleId\":null,\"chiefUserId\":null,\"employeeNumber\":null,\"officeLocation\":null,\"officePhone\":null,\"chiefMail\":null,\"chiefDisplayName\":null,\"iconUrl\":null,\"attachments\":[],\"personalPhone\":null,\"absenceBegin\":null,\"absenceEnd\":null,\"absenceType\":null,\"aboutMe\":null,\"birthdayDay\":null,\"birthdayMonth\":null,\"town\":null,\"hideBirthday\":false,\"isBlocked\":false,\"blockDate\":\"2999-12-31T00:00:00Z\",\"roles\":[{\"roleId\":13,\"roleType\":2,\"roleName\":\"Владелец проекта\",\"roleNameM\":\"role.project_owner\"}],\"isExternalUser\":true,\"firstName\":null,\"lastName\":null,\"middleName\":null,\"preferredCommunication\":null,\"isDeleted\":false,\"closeTs\":null,\"iconId\":null,\"telegramName\":null,\"projects\":[25072],\"isActive\":true,\"isNewUser\":false}]",
+    "status": 200,
+    "url": "https://yozhka.lukit.ru/backend/project/25072/activeUsers"
+  }
+]

@@ -430,6 +430,20 @@ class YozhkaClient:
             "contentCommentWithTags": "",
         })
 
+    async def get_comment(self, task_id: int, comment_id: int) -> dict:
+        result = await self.list_comments(task_id, size=9999)
+        for c in result.get("content", []):
+            if c.get("id") == comment_id:
+                return c
+        raise NotFoundError(f"Комментарий {comment_id} не найден в задаче {task_id}")
+
+    async def update_comment(self, comment: dict) -> dict:
+        """PUT /comment — полный объект комментария."""
+        return await self._request("PUT", ep.COMMENT, json_body=comment)
+
+    async def delete_comment(self, comment_id: int) -> Any:
+        return await self._request("DELETE", ep.COMMENT_ITEM.format(comment_id=comment_id))
+
     # ---------- Пользователи ----------
 
     async def get_my_profile(self) -> dict:

@@ -61,7 +61,12 @@ logger.info("Yozhka MCP: %s mode", "read-only" if config.read_only else "read-wr
 
 
 def main() -> None:
-    mcp.run()  # stdio по умолчанию
+    if config.transport in {"http", "streamable-http", "sse"}:
+        # Сервис-режим: YOZHKA_TRANSPORT=http (+ YOZHKA_HOST/PORT), см. Dockerfile.
+        mcp.run(transport="http" if config.transport in {"http", "streamable-http"} else "sse",
+                host=config.host, port=config.port)
+    else:
+        mcp.run()  # stdio по умолчанию
 
 
 if __name__ == "__main__":

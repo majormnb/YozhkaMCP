@@ -7,7 +7,7 @@ from fastmcp import Client
 from fastmcp.exceptions import ToolError
 
 from yozhka_mcp.api.text import mention_span
-from yozhka_mcp.tools._shared import html_with_mentions, wrap_html
+from yozhka_mcp.tools._shared import render_html, wrap_html
 
 XSS = '<img src=x onerror="alert(1)">'
 XSS_SCRIPT = "<script>alert(1)</script>"
@@ -15,11 +15,11 @@ XSS_SCRIPT = "<script>alert(1)</script>"
 
 # ---------- экранирование HTML ----------
 
-async def test_html_with_mentions_escapes_xss():
+async def test_render_html_escapes_xss():
     async def lookup(email):
         return []
 
-    html = await html_with_mentions(f"привет {XSS}", lookup)
+    html = await render_html(f"привет {XSS}", lookup)
     assert "<img" not in html
     assert "&lt;img" in html
     assert "<p>" in html and "</p>" in html
@@ -49,28 +49,28 @@ async def test_mention_span_id_must_be_numeric():
         mention_span("17160,junk@x", "a@b.c", "Имя")  # id с мусором не проходит
 
 
-async def test_html_with_mentions_builds_live_span():
+async def test_render_html_builds_live_span():
     async def lookup(email):
         return [{"id": 5, "mail": "user@yandex.ru", "displayName": "Егор"}]
 
-    html = await html_with_mentions("пинг @[user@yandex.ru] глянь", lookup)
+    html = await render_html("пинг @[user@yandex.ru] глянь", lookup)
     assert 'data-type="mention" data-id="5,user@yandex.ru" data-label="Егор"' in html
     assert "@[user@yandex.ru]" not in html
 
 
-async def test_html_with_mentions_unknown_email_raises():
+async def test_render_html_unknown_email_raises():
     async def lookup(email):
         return []
 
     with pytest.raises(ToolError):
-        await html_with_mentions("пинг @[nope@nope.nope]", lookup)
+        await render_html("пинг @[nope@nope.nope]", lookup)
 
 
-async def test_html_with_mentions_escapes_rest_of_text():
+async def test_render_html_escapes_rest_of_text():
     async def lookup(email):
         return [{"id": 5, "mail": "user@yandex.ru", "displayName": "Егор"}]
 
-    html = await html_with_mentions(f"@[user@yandex.ru] {XSS}", lookup)
+    html = await render_html(f"@[user@yandex.ru] {XSS}", lookup)
     assert "&lt;img" in html
     assert "<img" not in html
 
@@ -183,3 +183,58 @@ def test_base_url_rejects_plain_http_remote():
             Config()
     finally:
         monkey.undo()
+
+
+# ---------- ссылки ----------
+
+async def test_render_html_link_becomes_anchor():
+    async def lookup(email):
+        return []
+
+    html = await render_html("см. [PR #12](https://github.com/u/r/pull/12) подробно", lookup)
+    assert '<a href="https://github.com/u/r/pull/12">PR #12</a>' in html
+    assert "[PR #12](" not in html
+
+
+async def test_render_html_link_bad_scheme_stays_text():
+    async def lookup(email):
+        return []
+
+    html = await render_html("[клик](javascript:alert(1)) и [данные](data:text/html,x)", lookup)
+    assert "<a " not in html
+    assert "javascript:" in html  # остался экранированным текстом
+
+
+async def test_render_html_link_with_xss_label():
+    async def lookup(email):
+        return []
+
+    html = await render_html(f'[{XSS}](https://ok.example/a?b=1&c=2)', lookup)
+    assert "&lt;img" in html
+    assert "<img" not in html
+    # & в URL экранирован ровно один раз (пайплайн матчится по escape-тексту)
+    assert 'href="https://ok.example/a?b=1&amp;c=2"' in html
+    assert "&amp;amp;" not in html
+
+
+async def test_render_html_link_plus_mention_together():
+    async def lookup(email):
+        return [{"id": 5, "mail": "user@yandex.ru", "displayName": "Егор"}]
+
+    html = await render_html(
+        "@[user@yandex.ru] ревьми [PR #12](https://github.com/u/r/pull/12)", lookup)
+    assert 'data-type="mention"' in html
+    assert "<a href=" in html
+
+
+def test_strip_html_unwraps_anchors():
+    from yozhka_mcp.tools._shared import strip_html
+    assert strip_html('<p>см. <a href="https://x.example/pull/12" target="_blank">PR #12</a> тут</p>') \
+        == "см. PR #12 (https://x.example/pull/12) тут"
+
+
+def test_strip_html_unwraps_mention_span():
+    from yozhka_mcp.tools._shared import strip_html
+    html = ('<p>ревьювер <span data-type="mention" data-id="6537,a@b.c" '
+            'data-label="Nana">@Nana</span> смотрит</p>')
+    assert strip_html(html) == "ревьювер @Nana смотрит"

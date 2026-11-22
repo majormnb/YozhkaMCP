@@ -46,42 +46,53 @@ def compact(task: dict) -> dict:
 
 
 def strip_html(value: Any) -> Any:
-    """Убрать <p>…</p> обёртку из текстовых полей (пустая строка -> None)."""
+    """Убрать <p>…</p> обёртку из текстовых полей (пустая строка -> None).
+
+    Живые элементы разворачиваются в читаемый вид: якоря → «текст (url)»,
+    упоминания → «@Имя» — AI-клиент видит текст, а не HTML-мусор."""
     if not isinstance(value, str):
         return value
-    text = re.sub(r"</?p[^>]*>", "", value).strip()
+    text = _ANCHOR_RE.sub(r"\2 (\1)", value)
+    text = _MENTION_SPAN_RE.sub(r"@\1", text)
+    text = re.sub(r"</?p[^>]*>", "", text).strip()
     return text or None
 
 
 def wrap_html(value: str) -> str:
     """Безопасный HTML из текста: экранировать и обернуть в <p>…</p>.
 
-    Сырой HTML больше не пропускается (stored-XSS): маркеры упоминаний @[email]
-    экранирование переживают и подставляются после — через html_with_mentions.
+    Сырой HTML больше не пропускается (stored-XSS): упоминания @[email] и ссылки
+    [текст](url) экранирование переживают и подставляются после — через render_html.
     """
     return _text.wrap(_text.escape(value.strip()))
 
 
-async def html_with_mentions(text: str, lookup: Callable) -> str:
-    """Пайплайн безопасного HTML: escape → подстановка @[email]-упоминаний → <p>-обёртка.
+LINK_RE = re.compile(r"\[([^\]\n]+)\]\((https?://[^)\s]+)\)")
+MENTION_RE = re.compile(r"@\[([^\]]+)\]")
+_ANCHOR_RE = re.compile(r'<a\s[^>]*?href="([^"]*)"[^>]*>(.*?)</a>', re.S)
+_MENTION_SPAN_RE = re.compile(r'<span[^>]*data-type="mention"[^>]*data-label="([^"]*)"[^>]*>.*?</span>', re.S)
 
+
+async def render_html(text: str, lookup: Callable) -> str:
+    """Пайплайн безопасного HTML: escape → ссылки → упоминания → <p>-обёртка.
+
+    Ссылки: [текст](http…/https…) → живой <a>; прочие схемы остаются текстом.
+    Упоминания: @[email] → живой span; плейн «@имя» остаётся текстом.
     lookup — async функция email → список пользователей (client.find_user_by_email).
-    Плейн-текст «@имя» остаётся текстом: Ёжка делает упоминание живым только span-тегом.
     """
     escaped = _text.escape(text)
-    matches = {m.group(0): m.group(1).strip() for m in MENTION_RE.finditer(escaped)}
-    for raw, email in matches.items():
+    escaped = LINK_RE.sub(lambda m: _text.link_span(m.group(2), m.group(1)), escaped)
+    emails = {m.group(1).strip() for m in MENTION_RE.finditer(escaped)}
+    spans: dict[str, str] = {}
+    for email in emails:
         users = await lookup(email)
         if not users:
             raise ToolError(f"@[{email}]: пользователь не найден")
         user = users[0]
         mail = user.get("mail") or user.get("email") or ""
-        span = _text.mention_span(user["id"], mail, user.get("displayName") or mail)
-        escaped = escaped.replace(raw, span)
+        spans[email] = _text.mention_span(user["id"], mail, user.get("displayName") or mail)
+    escaped = MENTION_RE.sub(lambda m: spans[m.group(1).strip()], escaped)
     return _text.wrap(escaped)
-
-
-MENTION_RE = re.compile(r"@\[([^\]]+)\]")
 
 
 def page_info(response: dict) -> dict:

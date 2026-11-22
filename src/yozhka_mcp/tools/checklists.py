@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastmcp import FastMCP
 
 from ..api.client import YozhkaClient
-from ._shared import compact, html_with_mentions, run, strip_html, write_guard
+from ._shared import compact, render_html, run, strip_html, write_guard
 
 
 def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
@@ -21,10 +21,10 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
 
     @mcp.tool
     async def add_checklist_item(task_code: str, title: str) -> dict:
-        """[write] Добавить пункт в чек-лист задачи. Упоминания: @[email] → живой тег."""
+        """[write] Добавить пункт в чек-лист задачи. Упоминания @[email] → живой тег; ссылки [текст](https://…) → живая ссылка."""
         async def _fn():
             task = await client.get_task(task_code)
-            html = await html_with_mentions(title, client.find_user_by_email)
+            html = await render_html(title, client.find_user_by_email)
             existing = await client.list_checklist(task["id"])
             order = max((i.get("orderNum", 0) for i in existing.get("content", [])), default=0) + 1
             return await client.add_checklist_item(task["id"], html, order_num=order)
@@ -53,7 +53,7 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
             task = await client.get_task(task_code)
             item = await client.get_checklist_item(task["id"], item_id)
             if title is not None:
-                item["itemTitle"] = await html_with_mentions(title, client.find_user_by_email)
+                item["itemTitle"] = await render_html(title, client.find_user_by_email)
             if deadline is not None:
                 item["deadlineClTs"] = f"{deadline}T23:59:59+03:00" if deadline else None
             if executor_ids is not None:

@@ -81,10 +81,26 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
         return await run(write_guard(read_only, _fn))
 
     @mcp.tool
-    async def update_task(task_code: str, title: str | None = None, description: str | None = None) -> dict:
-        """[write] Изменить название и/или описание задачи. В description: @[email] → живой тег, [текст](https://…) → живая ссылка."""
+    async def update_task(task_code: str, title: str | None = None,
+                          description: str | None = None, confirm: bool = False) -> dict:
+        """[write] Изменить название и/или описание задачи. В description: @[email] → живой тег, [текст](https://…) → живая ссылка.
+        Гейт подтверждения: в задаче, созданной ДРУГИМ пользователем, изменение title и/или description
+        без confirm=True вернёт confirmation_required и НИЧЕГО не изменит (задай вопрос, повтори с
+        confirm=True после явного «да»). В СВОИХ задачах (автор — текущий пользователь) — без подтверждения."""
         async def _fn():
             task = await client.get_task(task_code)
+            changes = [k for k, v in (("title", title), ("description", description)) if v is not None]
+            if changes and not confirm:
+                me = await client.get_my_profile()
+                if task.get("creatorId") != me["id"]:
+                    return {
+                        "confirmation_required": True,
+                        "task": task_code,
+                        "action": "update_" + "_and_".join(changes),
+                        "message": (f"Задача {task_code} создана другим пользователем. Вы уверены, "
+                                    f"что хотите изменить {' и '.join(changes)}? Повтори вызов с "
+                                    "confirm=true только после явного подтверждения пользователя."),
+                    }
             if title is not None:
                 task["title"] = title
             if description is not None:
@@ -166,10 +182,22 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
         return await run(write_guard(read_only, _fn))
 
     @mcp.tool
-    async def delete_task(task_code: str) -> dict:
-        """[write] Удалить задачу (необратимо!)."""
+    async def delete_task(task_code: str, confirm: bool = False) -> dict:
+        """[write] Удалить задачу (НЕОБРАТИМО). Требует подтверждения пользователя: без confirm=True
+        тул вернёт confirmation_required и ничего не удалит — задай вопрос пользователю и повтори
+        вызов с confirm=True только после явного «да»."""
         async def _fn():
             task = await client.get_task(task_code)
+            if not confirm:
+                return {
+                    "confirmation_required": True,
+                    "task": task_code,
+                    "action": "delete_task",
+                    "task_title": task.get("title"),
+                    "message": (f"Вы уверены, что хотите УДАЛИТЬ задачу {task_code} "
+                                f"«{task.get('title')}»? Действие необратимо. Повтори вызов с "
+                                "confirm=true только после явного подтверждения пользователя."),
+                }
             await client.delete_task(task["id"])
             return {"deleted": task_code, "id": task["id"]}
         return await run(write_guard(read_only, _fn))

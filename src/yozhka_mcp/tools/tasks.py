@@ -173,12 +173,18 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
 
     @mcp.tool
     async def complete_task(task_code: str, completed: bool = True) -> dict:
-        """[write] Отметить задачу выполненной/вернуть в работу (isCompleted)."""
+        """[write] Отметить задачу выполненной/вернуть в работу.
+        Использует toggleCompletion (PUT с isCompleted сервер молча игнорирует —
+        известная коварность API); тогглится только если текущее состояние не совпадает."""
         async def _fn():
             task = await client.get_task(task_code)
-            task["isCompleted"] = completed
-            updated = await client.update_task(task)
-            return compact(updated)
+            if bool(task.get("isCompleted")) != completed:
+                await client.toggle_task_completion(task["id"])
+            updated = await client.get_task(task_code)  # фактическое состояние после тоггла
+            result = compact(updated)
+            result["isCompleted"] = updated.get("isCompleted")
+            result["completeTs"] = updated.get("completeTs")
+            return result
         return await run(write_guard(read_only, _fn))
 
     @mcp.tool

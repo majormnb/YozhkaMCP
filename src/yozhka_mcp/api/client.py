@@ -390,6 +390,11 @@ class YozhkaClient:
     async def delete_task(self, task_id: int) -> Any:
         return await self._request("DELETE", ep.TASK_BY_ID.format(task_id=task_id))
 
+    async def toggle_task_completion(self, task_id: int) -> Any:
+        """Настоящее завершение/возврат: сервер штампует completeTs.
+        PUT /task с isCompleted он молча игнорирует."""
+        return await self._request("POST", ep.TASK_TOGGLE_COMPLETION.format(task_id=task_id))
+
     async def list_priorities(self) -> list:
         return await self._request("GET", ep.TASK_PRIORITY)
 

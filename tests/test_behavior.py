@@ -13,6 +13,13 @@ from yozhka_mcp import server
 BASE = "https://yozhka.lukit.ru/backend"
 
 
+def _data(result):
+    data = getattr(result, "data", None)
+    if data is None:
+        return json.loads(result.content[0].text)
+    return data
+
+
 def _result_data(result):
     return result.data if hasattr(result, "data") else json.loads(result.content[0].text)
 
@@ -127,3 +134,67 @@ async def test_api_error_becomes_readable_tool_error():
             raise AssertionError("должен был упасть")
         except ToolError as exc:
             assert "403" in str(exc) and "Доступ запрещен" in str(exc)
+
+
+# ---------- подтверждение опасных действий ----------
+
+@respx.mock
+async def test_update_description_requires_confirmation():
+    """Изменение описания без confirm=True НЕ выполняется — возвращается вопрос."""
+    put_route = respx.put(f"{BASE}/task").respond(json={"id": 1})
+    async with Client(server.mcp) as c:
+        r = await c.call_tool("update_task", {
+            "task_code": "X-1", "description": "новое описание"})
+        data = _data(r)
+        assert data["confirmation_required"] is True
+        assert "Вы уверены" in data["message"]
+        assert not put_route.called  # ничего не изменено
+
+
+@respx.mock
+async def test_update_description_with_confirm_executes():
+    get_route = respx.get(f"{BASE}/task/code/X-1").respond(json={
+        "id": 1, "code": "X-1", "title": "T", "statusId": 2, "projectId": 5,
+        "contentData": "<p>старое</p>"})
+    put_route = respx.put(f"{BASE}/task").respond(json={
+        "id": 1, "code": "X-1", "contentData": "<p>новое</p>"})
+    async with Client(server.mcp) as c:
+        r = await c.call_tool("update_task", {
+            "task_code": "X-1", "description": "новое", "confirm": True})
+        assert _data(r)["description"] == "новое"
+        assert put_route.called
+
+
+@respx.mock
+async def test_update_title_only_no_confirmation():
+    """Переименование — без гейта (пользователь просил гейтить только описание)."""
+    respx.get(f"{BASE}/task/code/X-1").respond(json={
+        "id": 1, "code": "X-1", "title": "T", "statusId": 2, "projectId": 5})
+    put_route = respx.put(f"{BASE}/task").respond(json={"id": 1, "code": "X-1", "title": "Новый"})
+    async with Client(server.mcp) as c:
+        r = await c.call_tool("update_task", {"task_code": "X-1", "title": "Новый"})
+        assert _data(r)["title"] == "Новый"
+        assert put_route.called
+
+
+@respx.mock
+async def test_delete_task_requires_confirmation():
+    delete_route = respx.delete(f"{BASE}/task/1").respond(json={})
+    respx.get(f"{BASE}/task/code/X-1").respond(json={"id": 1, "code": "X-1", "title": "Важная"})
+    async with Client(server.mcp) as c:
+        r = await c.call_tool("delete_task", {"task_code": "X-1"})
+        data = _data(r)
+        assert data["confirmation_required"] is True
+        assert "УДАЛИТЬ" in data["message"] and "необратимо" in data["message"]
+        assert data["task_title"] == "Важная"
+        assert not delete_route.called  # задача жива
+
+
+@respx.mock
+async def test_delete_task_with_confirm_executes():
+    respx.get(f"{BASE}/task/code/X-1").respond(json={"id": 1, "code": "X-1", "title": "Важная"})
+    delete_route = respx.delete(f"{BASE}/task/1").respond(json={})
+    async with Client(server.mcp) as c:
+        r = await c.call_tool("delete_task", {"task_code": "X-1", "confirm": True})
+        assert _data(r)["deleted"] == "X-1"
+        assert delete_route.called

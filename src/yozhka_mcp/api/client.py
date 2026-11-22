@@ -122,7 +122,11 @@ class YozhkaClient:
             return None
         content_type = response.headers.get("content-type", "")
         if "json" in content_type:
-            return response.json()
+            try:
+                return response.json()
+            except ValueError:
+                # коварность: generateMCode и др. шлют плоский текст с content-type: json
+                return response.text
         return response.text
 
     def _raise_from_response(self, response: httpx.Response) -> None:
@@ -393,6 +397,20 @@ class YozhkaClient:
         return await self._request("POST", ep.CHECKLIST_MARK.format(item_id=item_id), json_body={
             "itemId": item_id, "taskId": task_id, "returnValue": not checked,
         })
+
+    async def get_checklist_item(self, task_id: int, item_id: int) -> dict:
+        result = await self.list_checklist(task_id)
+        for item in result.get("content", []):
+            if item.get("id") == item_id:
+                return item
+        raise NotFoundError(f"Пункт чек-листа {item_id} не найден в задаче {task_id}")
+
+    async def update_checklist_item(self, item: dict) -> dict:
+        """PUT /checklist — как и PUT /task, требует ПОЛНЫЙ объект пункта."""
+        return await self._request("PUT", ep.CHECKLIST, json_body=item)
+
+    async def delete_checklist_item(self, item_id: int) -> Any:
+        return await self._request("DELETE", ep.CHECKLIST_ITEM.format(item_id=item_id))
 
     # ---------- Комментарии ----------
 

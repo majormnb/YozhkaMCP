@@ -51,8 +51,9 @@ TASK_HISTORY = "/task/{task_id}/history"                   # GET ?page=0&size=
 
 # --- Чек-листы ---
 CHECKLIST_LIST = "/checklist/{task_id}/list"               # GET ?page=0&size=&searchText=
-CHECKLIST = "/checklist"                                   # POST {taskId, itemTitle, ...}
+CHECKLIST = "/checklist"                                   # POST создать пункт, PUT полный объект пункта
 CHECKLIST_MARK = "/checklist/mark/{item_id}"               # POST {itemId, taskId, returnValue}
+CHECKLIST_ITEM = "/checklist/{item_id}"                    # DELETE пункт
 
 # --- Комментарии ---
 COMMENT_LIST = "/comment/{task_id}/list"                   # GET ?page=0&size=&search=&filter={}

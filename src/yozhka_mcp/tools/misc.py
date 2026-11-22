@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastmcp import FastMCP
 
 from ..api.client import YozhkaClient
-from ._shared import page_info
+from ._shared import page_info, run, write_guard
 
 
 def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
@@ -21,3 +21,11 @@ def register(mcp: FastMCP, client: YozhkaClient, read_only: bool) -> None:
         result = await client.list_notifications(page=page, size=size)
         result["page"] = page_info(result)
         return result
+
+    @mcp.tool
+    async def ack_notifications() -> dict:
+        """[write] Отметить все уведомления прочитанными."""
+        async def _fn():
+            await client.ack_notifications()
+            return {"acked": True}
+        return await run(write_guard(read_only, _fn))

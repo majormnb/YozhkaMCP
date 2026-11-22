@@ -73,9 +73,11 @@ mcp = FastMCP(
 )
 
 # Регистрация тулов по доменам (READ_ONLY скрывает [write]-тулы в lifespan)
-from .tools import auth, checklists, columns, comments, misc, projects, tasks, workspaces  # noqa: E402
+from .tools import (auth, attachments, checklists, columns, comments,  # noqa: E402
+                    misc, projects, tasks, workspaces)
 
-for module in (auth, workspaces, projects, columns, tasks, checklists, comments, misc):
+for module in (auth, workspaces, projects, columns, tasks, checklists,
+               comments, attachments, misc):
     module.register(mcp, client, read_only=config.read_only)
 
 logger.info("Yozhka MCP: %s mode", "read-only" if config.read_only else "read-write")
